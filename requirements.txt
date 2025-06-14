@@ -1,0 +1,15 @@
+streamlit
+pandas==1.5.3
+pyyaml==6.0.2
+openai
+langchain
+llama-index
+PyMuPDF
+tiktoken
+azure-core
+azure-identity
+langchain-openai
+llama-index-embeddings-azure-openai
+llama-index-llms-azure-openai
+llama-index-readers-file
+sqlite3
