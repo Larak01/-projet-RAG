@@ -12,6 +12,9 @@ framework = st.radio("Choisir le moteur d'indexation :", ["LangChain", "LlamaInd
 # Choix de la langue de réponse
 langue = st.selectbox("Langue de la réponse :", ["Français", "Anglais", "Espagnol", "Japonais"])
 
+# Choix du nombre de documents à récupérer (top_k)
+top_k = st.slider("Nombre de documents similaires à récupérer :", min_value=1, max_value=10, value=5)
+
 # Upload fichier PDF
 uploaded_file = st.file_uploader("Déposer un fichier PDF", type=["pdf"])
 
@@ -46,9 +49,9 @@ if question:
         full_question = message_prefix + question
 
         if framework == "LangChain":
-            response = lc_answer(full_question)
+            response = lc_answer(full_question, k=top_k)
         else:
-            response = li_answer(full_question)
+            response = li_answer(full_question, k=top_k)
 
         st.markdown("### Réponse :")
         st.write(response)
@@ -56,4 +59,3 @@ if question:
 # Pied de page
 st.markdown("---")
 st.caption("Projet MAG 3 — Hands-on RAG — Larak01")
-
