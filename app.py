@@ -64,16 +64,17 @@ if question:
         st.markdown("### Réponse :")
         st.write(response)
 
-        # Feedback utilisateur avec enregistrement dans SQLite
-        st.markdown("### Votre avis sur la réponse :")
-        feedback = st.feedback("Cette réponse était-elle utile ?", key="feedback")
+# Feedback utilisateur avec enregistrement dans SQLite
+st.markdown("### Votre avis sur la réponse :")
+feedback = st.radio("Cette réponse était-elle utile ?", ["Oui", "Non"], horizontal=True)
 
-        if feedback:
-            timestamp = datetime.now().isoformat()
-            c.execute("INSERT INTO feedbacks VALUES (?, ?, ?, ?)",
-                      (timestamp, question, response, feedback))
-            conn.commit()
-            st.success("Merci pour votre retour !")
+if feedback:
+    timestamp = datetime.now().isoformat()
+    c.execute("INSERT INTO feedbacks VALUES (?, ?, ?, ?)",
+              (timestamp, question, response, feedback))
+    conn.commit()
+    st.success("Merci pour votre retour !")
+
 
 # Fermeture base
 conn.close()
