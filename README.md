@@ -13,36 +13,5 @@ Ce projet est réalisé dans le cadre du module "Hands-on Project" (MAG 3). Il a
 - Déployer une interface interactive via Streamlit
 - Explorer des pistes d’amélioration (langue, feedback, top-k…)
 
----
-
-## 📁 Structure du projet
 
 
----
-
-## ⚙️ Prérequis techniques
-
-- Python 3.10+
-- Accès à Azure OpenAI avec :
-  - Un modèle d'embedding (`text-embedding-ada-002` ou autre)
-  - Un modèle de chat (`gpt-35-turbo`, `gpt-4`, etc.)
-- Un environnement virtuel Python (recommandé)
-
----
-
-## 🔐 Configuration Azure (secrets/config.yaml)
-
-Créer un fichier `secrets/config.yaml` **(non versionné)** :
-
-```yaml
-embedding:
-  azure_endpoint: "https://mon-endpoint.openai.azure.com/"
-  azure_deployment: "embedding-model"
-  azure_api_version: "2023-05-15"
-  azure_api_key: "ma-cle-api"
-
-chat:
-  azure_endpoint: "https://mon-endpoint.openai.azure.com/"
-  azure_deployment: "chat-model"
-  azure_api_version: "2023-05-15"
-  azure_api_key: "ma-cle-api"
