@@ -9,6 +9,9 @@ st.title("📚 Assistant Documentaire - Projet RAG")
 # Choix du framework
 framework = st.radio("Choisir le moteur d'indexation :", ["LangChain", "LlamaIndex"])
 
+# Choix de la langue de réponse
+langue = st.selectbox("Langue de la réponse :", ["Français", "Anglais", "Espagnol", "Japonais"])
+
 # Upload fichier PDF
 uploaded_file = st.file_uploader("Déposer un fichier PDF", type=["pdf"])
 
@@ -29,12 +32,23 @@ if uploaded_file is not None:
 # Entrée question utilisateur
 question = st.text_input("Posez votre question sur le document :")
 
+# Mapping des langues vers codes ou instructions
+langue_map = {
+    "Français": "Réponds en français.",
+    "Anglais": "Respond in English.",
+    "Espagnol": "Responde en español.",
+    "Japonais": "日本語で答えてください。"
+}
+
 if question:
     with st.spinner("Recherche de la réponse..."):
+        message_prefix = langue_map.get(langue, "") + "\n"
+        full_question = message_prefix + question
+
         if framework == "LangChain":
-            response = lc_answer(question)
+            response = lc_answer(full_question)
         else:
-            response = li_answer(question)
+            response = li_answer(full_question)
 
         st.markdown("### Réponse :")
         st.write(response)
@@ -42,3 +56,4 @@ if question:
 # Pied de page
 st.markdown("---")
 st.caption("Projet MAG 3 — Hands-on RAG — Larak01")
+
