@@ -31,7 +31,8 @@ cd -projet-RAG
 pip install -r requirements.txt
 streamlit run app.py
 
-## 🌍 Déploiement Streamlit Cloud
+## 🌍 Application déployée
 
-Accédez à l'application ici : [https://projet-rag-larak01.streamlit.app](https://projet-rag-larak01.streamlit.app) 
+👉 Accédez à l’application ici : [https://projet-rag-larak01.streamlit.app](https://projet-rag-larak01.streamlit.app)
+
 
