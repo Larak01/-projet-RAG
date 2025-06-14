@@ -1,5 +1,7 @@
 import streamlit as st
 import os
+import sqlite3
+from datetime import datetime
 from langchain import store_pdf_file as lc_store, answer_question as lc_answer
 from llamaindex import store_pdf_file as li_store, answer_question as li_answer
 
@@ -14,6 +16,12 @@ langue = st.selectbox("Langue de la réponse :", ["Français", "Anglais", "Espag
 
 # Choix du nombre de documents à récupérer (top_k)
 top_k = st.slider("Nombre de documents similaires à récupérer :", min_value=1, max_value=10, value=5)
+
+# Connexion à la base SQLite
+conn = sqlite3.connect("feedback.db")
+c = conn.cursor()
+c.execute('''CREATE TABLE IF NOT EXISTS feedbacks
+             (timestamp TEXT, question TEXT, response TEXT, feedback TEXT)''')
 
 # Upload fichier PDF
 uploaded_file = st.file_uploader("Déposer un fichier PDF", type=["pdf"])
@@ -55,6 +63,20 @@ if question:
 
         st.markdown("### Réponse :")
         st.write(response)
+
+        # Feedback utilisateur avec enregistrement dans SQLite
+        st.markdown("### Votre avis sur la réponse :")
+        feedback = st.feedback("Cette réponse était-elle utile ?", key="feedback")
+
+        if feedback:
+            timestamp = datetime.now().isoformat()
+            c.execute("INSERT INTO feedbacks VALUES (?, ?, ?, ?)",
+                      (timestamp, question, response, feedback))
+            conn.commit()
+            st.success("Merci pour votre retour !")
+
+# Fermeture base
+conn.close()
 
 # Pied de page
 st.markdown("---")
