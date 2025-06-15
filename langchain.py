@@ -1,4 +1,3 @@
-import streamlit as st
 import yaml
 from datetime import datetime
 
@@ -12,7 +11,15 @@ from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
 CHUNK_SIZE = 1_000
 CHUNK_OVERLAP = 200
 
-config = st.secrets
+def read_config(file_path):
+    with open(file_path, 'r') as file:
+        try:
+            return yaml.safe_load(file)
+        except yaml.YAMLError as e:
+            print(f"Erreur de lecture YAML : {e}")
+            return None
+
+config = read_config("secrets/config.yaml")
 
 embedder = AzureOpenAIEmbeddings(
     azure_endpoint=config["embedding"]["azure_endpoint"],
@@ -31,4 +38,4 @@ llm = AzureChatOpenAI(
 )
 
 ...
-# (reste du fichier inchangé, déjà corrigé pour langchain_text_splitters et top_k/langue)
+# (reste du fichier inchangé, fonctionne avec config.yaml local)
