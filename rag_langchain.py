@@ -1,3 +1,4 @@
+import yaml
 from datetime import datetime
 
 from langchain_community.document_loaders import PyMuPDFLoader
@@ -6,32 +7,45 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
 
-# ✅ Paramètres Azure DIRECTEMENT dans le code (⚠️ à ne pas publier en ligne)
-embedder = AzureOpenAIEmbeddings(
-    azure_endpoint="https://mon-instance.openai.azure.com",
-    azure_deployment="text-embedding-ada-002",
-    api_key="sk-...votre-clé-embedding...",
-    api_version="2024-02-15"
-)
-
-llm = AzureChatOpenAI(
-    azure_endpoint="https://mon-instance.openai.azure.com",
-    azure_deployment="gpt-35-turbo",
-    api_key="sk-...votre-clé-chat...",
-    api_version="2024-02-15"
-)
-
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 
-# ✅ FAISS vide
+
+def read_config(file_path):
+    with open(file_path, 'r') as file:
+        try:
+            return yaml.safe_load(file)
+        except yaml.YAMLError as e:
+            print(f"Erreur YAML: {e}")
+            return None
+
+# ✅ Charger config locale
+config = read_config("config.yaml")
+
+# ✅ Embeddings
+embedder = AzureOpenAIEmbeddings(
+    azure_endpoint=config["embedding"]["azure_endpoint"],
+    azure_deployment=config["embedding"]["azure_deployment"],
+    api_key=config["embedding"]["azure_api_key"],
+    api_version=config["embedding"]["azure_api_version"]
+)
+
+# ✅ LLM
+llm = AzureChatOpenAI(
+    azure_endpoint=config["chat"]["azure_endpoint"],
+    azure_deployment=config["chat"]["azure_deployment"],
+    api_key=config["chat"]["azure_api_key"],
+    api_version=config["chat"]["azure_api_version"]
+)
+
+# ✅ Index vide initial
 vector_store = FAISS.from_documents([], embedder)
 
 
 def get_meta_doc(extract: str) -> str:
     messages = [
         ("system", "You are a librarian extracting metadata from documents."),
-        ("user", f"""Extract this metadata. Answer 'unknown' if missing.
+        ("user", f"""Extract the following metadata. Answer 'unknown' if missing.
 - title
 - author
 - source
@@ -43,7 +57,8 @@ def get_meta_doc(extract: str) -> str:
 {extract}
 </content>""")
     ]
-    return llm.invoke(messages).content
+    response = llm.invoke(messages)
+    return response.content
 
 
 def store_pdf_file(file_path: str, doc_name: str, use_meta_doc: bool = True):
@@ -85,4 +100,5 @@ def answer_question(question: str) -> str:
     docs = retrieve(question)
     context = "\n\n".join(d.page_content for d in docs)
     messages = build_qa_messages(question, context)
-    return llm.invoke(messages).content
+    response = llm.invoke(messages)
+    return response.content
