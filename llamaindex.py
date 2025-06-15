@@ -6,7 +6,7 @@ from llama_index.core import Settings
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import TextNode
 from llama_index.core.vector_stores import SimpleVectorStore, VectorStoreQuery
-from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
+from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.azure_openai import AzureOpenAI
 from llama_index.readers.file import PyMuPDFReader
 
@@ -36,12 +36,12 @@ llm = AzureOpenAI(
     api_version=resolve_env(config["chat"]["azure_api_version"]),
 )
 
-embedder = AzureOpenAIEmbedding(
+embedder = OpenAIEmbedding(
     model=resolve_env(config["embedding"]["azure_deployment"]),
-    deployment_name=resolve_env(config["embedding"]["azure_deployment"]),
+    base_url=resolve_env(config["embedding"]["azure_endpoint"]),
     api_key=resolve_env(config["embedding"]["azure_api_key"]),
-    azure_endpoint=resolve_env(config["embedding"]["azure_endpoint"]),
     api_version=resolve_env(config["embedding"]["azure_api_version"]),
+    additional_headers={"api-key": resolve_env(config["embedding"]["azure_api_key"])}
 )
 
 Settings.llm = llm
