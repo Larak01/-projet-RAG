@@ -105,12 +105,7 @@ def build_qa_messages(question: str, context: str) -> list[str]:
 def answer_question(question: str) -> str:
     docs = retrieve(question)
     docs_content = "\n\n".join(doc.get_content() for doc in docs)
-    print("Question:", question)
-    print("------")
-    for doc in docs:
-        print("Chunk:", doc.id)
-        print(doc.get_content())
-        print("------")
     messages = build_qa_messages(question, docs_content)
     response = llm.invoke(messages)
     return response.content
+
