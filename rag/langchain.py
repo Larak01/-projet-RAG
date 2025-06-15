@@ -26,8 +26,6 @@ embedder = AzureOpenAIEmbeddings(
 
 vector_store = InMemoryVectorStore(embedder)
 
-st.write("🟢 Clé détectée:", st.secrets["chat_azure_deployment"])
-
 def get_meta_doc(extract: str) -> str:
     messages = [
         ("system", "You are a librarian extracting metadata from documents."),
