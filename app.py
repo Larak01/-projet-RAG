@@ -2,20 +2,17 @@ import streamlit as st
 import os
 import sqlite3
 from datetime import datetime
+from rag_langchain import store_pdf_file as lc_store, answer_question as lc_answer
+from llamaindex import store_pdf_file as li_store, answer_question as li_answer
 
 # ✅ Créer le dossier s'il n'existe pas
 os.makedirs("uploaded_docs", exist_ok=True)
 
+st.set_page_config(page_title="Assistant Documentaire", layout="centered")
 st.title("📚 Assistant Documentaire - Projet RAG")
 
 # Choix du framework
 framework = st.radio("Choisir le moteur d'indexation :", ["LangChain", "LlamaIndex"])
-
-# 📦 Import dynamique du module selon le choix
-if framework == "LangChain":
-    import rag_langchain as rag
-else:
-    import rag_llamaindex as rag
 
 # Choix de la langue de réponse
 langue = st.selectbox("Langue de la réponse :", ["Français", "Anglais", "Espagnol", "Japonais"])
@@ -26,11 +23,21 @@ top_k = st.slider("Nombre de documents similaires à récupérer :", min_value=1
 # Connexion SQLite
 conn = sqlite3.connect("feedback.db")
 c = conn.cursor()
-c.execute("CREATE TABLE IF NOT EXISTS feedbacks (timestamp TEXT, question TEXT, response TEXT, feedback TEXT)")
+c.execute("""
+    CREATE TABLE IF NOT EXISTS feedbacks (
+        timestamp TEXT, 
+        question TEXT, 
+        response TEXT, 
+        feedback TEXT
+    )
+""")
 
 @st.cache_data
-def cached_store(path, name):
-    rag.store_pdf_file(path, name)
+def cached_store(framework, path, name):
+    if framework == "LangChain":
+        lc_store(path, name)
+    else:
+        li_store(path, name)
 
 # 📥 Upload PDF
 uploaded_file = st.file_uploader("Déposer un fichier PDF", type=["pdf"])
@@ -45,7 +52,7 @@ if uploaded_file is not None:
     # Indexation avec gestion d'erreur
     st.write("📥 Indexation en cours...")
     try:
-        cached_store(file_path, uploaded_file.name)
+        cached_store(framework, file_path, uploaded_file.name)
         st.success("Indexation réussie.")
     except Exception as e:
         st.error(f"Erreur d’indexation : {e}")
@@ -67,12 +74,14 @@ if question:
     with st.spinner("Recherche de la réponse..."):
         full_question = langue_map.get(langue, "") + "\n" + question
         try:
-            response = rag.answer_question(full_question)
-        except Exception as e:
-            st.error(f"Erreur pendant la génération de réponse : {e}")
-        else:
+            if framework == "LangChain":
+                response = lc_answer(full_question, k=top_k)
+            else:
+                response = li_answer(full_question, k=top_k)
             st.markdown("### Réponse :")
             st.write(response)
+        except Exception as e:
+            st.error(f"Erreur de génération : {e}")
 
 # ✅ Feedback utilisateur
 st.markdown("### Votre avis sur la réponse :")
