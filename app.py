@@ -1,52 +1,73 @@
 import streamlit as st
-from datetime import datetime
+import os
 import sqlite3
-from rag_langchain import store_pdf_file as lc_store, answer_question as lc_answer
-from llamaindex import store_pdf_file as li_store, answer_question as li_answer
+from datetime import datetime
 
-st.title("📚 Assistant RAG – Projet MAG3")
+from langchain_community.document_loaders import PyMuPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain.embeddings.fake import FakeEmbeddings
+from langchain.llms.fake import FakeListLLM
+from langchain_core.documents import Document
 
-framework = st.radio("Choix du moteur :", ["LangChain", "LlamaIndex"])
-langue = st.selectbox("Langue de réponse :", ["Français", "Anglais", "Espagnol", "Japonais"])
-top_k = st.slider("Top-K documents :", 1, 10, 5)
+# 📁 Dossier pour les fichiers
+os.makedirs("uploaded_docs", exist_ok=True)
 
-conn = sqlite3.connect("feedback.db")
-c = conn.cursor()
-c.execute("CREATE TABLE IF NOT EXISTS feedbacks (timestamp TEXT, question TEXT, response TEXT, feedback TEXT)")
+# 🧠 Simule les embeddings + LLM
+embedder = FakeEmbeddings()
+llm = FakeListLLM(responses=["Ceci est une réponse factice."])
+vector_store = FAISS.from_documents([], embedder)
 
+# 🔢 Paramètres
+CHUNK_SIZE = 1000
+CHUNK_OVERLAP = 200
+
+# 🧩 Langue de réponse
 langue_map = {
     "Français": "Réponds en français.",
-    "Anglais": "Answer in English.",
+    "Anglais": "Respond in English.",
     "Espagnol": "Responde en español.",
     "Japonais": "日本語で答えてください。"
 }
 
-st.markdown("### 📄 Charger un PDF")
-uploaded_file = st.file_uploader("Uploader un fichier PDF", type=["pdf"])
+# 🧠 Indexation PDF
+def store_pdf_file(file_path: str, doc_name: str):
+    loader = PyMuPDFLoader(file_path)
+    docs = loader.load()
+
+    splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
+    chunks = splitter.split_documents(docs)
+
+    for chunk in chunks:
+        chunk.metadata = {
+            "document_name": doc_name,
+            "insert_date": datetime.now()
+        }
+
+    vector_store.add_documents(chunks)
+
+# 🔍 Recherche
+def answer_question(question: str, langue: str):
+    context_docs = vector_store.similarity_search(question, k=5)
+    context = "\n\n".join(doc.page_content for doc in context_docs)
+    prompt = f"{langue_map[langue]}\n\nContexte:\n{context}\n\nQuestion: {question}"
+    return llm.invoke(prompt)
+
+# 🖼️ UI
+st.title("📚 Assistant RAG - Projet MAG3")
+langue = st.selectbox("Langue de la réponse :", list(langue_map.keys()))
+uploaded_file = st.file_uploader("Déposez un fichier PDF", type=["pdf"])
+
 if uploaded_file:
-    path = f"uploaded_docs/{uploaded_file.name}"
-    with open(path, "wb") as f:
+    file_path = os.path.join("uploaded_docs", uploaded_file.name)
+    with open(file_path, "wb") as f:
         f.write(uploaded_file.read())
-    st.success("✅ Fichier chargé.")
-    if framework == "LangChain":
-        lc_store(path, uploaded_file.name)
-    else:
-        li_store(path, uploaded_file.name)
-    st.success("✅ Indexation terminée.")
+    st.success("Fichier chargé.")
+    store_pdf_file(file_path, uploaded_file.name)
 
-question = st.text_input("❓ Votre question :")
+question = st.text_input("Posez votre question :")
 if question:
-    full_q = langue_map[langue] + "\n" + question
-    with st.spinner("Recherche..."):
-        response = lc_answer(full_q, k=top_k) if framework == "LangChain" else li_answer(full_q, k=top_k)
+    with st.spinner("Réflexion en cours..."):
+        reponse = answer_question(question, langue)
         st.markdown("### Réponse :")
-        st.write(response)
-
-    feedback = st.radio("Utile ?", ["Oui", "Non"], horizontal=True)
-    if feedback:
-        c.execute("INSERT INTO feedbacks VALUES (?, ?, ?, ?)",
-                  (datetime.now().isoformat(), question, response, feedback))
-        conn.commit()
-        st.success("Merci pour votre retour !")
-
-conn.close()
+        st.write(reponse)
