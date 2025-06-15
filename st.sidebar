@@ -1,5 +1,0 @@
-with st.sidebar:
-    st.header("Paramètres")
-    framework = st.radio("Framework :", ["LangChain", "LlamaIndex"])
-    langue = st.selectbox("Langue de la réponse :", ["Français", "Anglais", "Espagnol", "Japonais"])
-    top_k = st.slider("Nombre de documents :", 1, 10, 5)
