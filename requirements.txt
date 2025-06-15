@@ -5,3 +5,4 @@ pymupdf
 streamlit
 PyYAML
 toml
+llama-index
