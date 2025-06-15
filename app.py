@@ -2,7 +2,7 @@ import streamlit as st
 import os
 import sqlite3
 from datetime import datetime
-from langchain import store_pdf_file as lc_store, answer_question as lc_answer
+from rag_langchain import store_pdf_file as lc_store, answer_question as lc_answer
 from llamaindex import store_pdf_file as li_store, answer_question as li_answer
 
 # ✅ Créer le dossier s'il n'existe pas
