@@ -35,7 +35,7 @@ embedder = AzureOpenAIEmbeddings(
     api_key=config["embedding"]["azure_api_key"]
 )
 
-vector_store = InMemoryVectorStore(embedder)
+vector_store = FAISS.from_documents([], embedder)
 
 llm = AzureChatOpenAI(
     azure_endpoint=config["chat"]["azure_endpoint"],
@@ -99,7 +99,8 @@ def store_pdf_file(file_path: str, doc_name: str, use_meta_doc: bool=True):
                                 'insert_date': datetime.now()
                                 })
         all_splits.append(meta_doc)
-    _ = vector_store.add_documents(documents=all_splits)
+     = vector_store.add_documents(all_splits)
+
     return
 
 
