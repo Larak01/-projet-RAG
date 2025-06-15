@@ -21,6 +21,7 @@ Ce projet met en œuvre une architecture **RAG (Retrieval-Augmented Generation)*
 - 🌍 Sélecteur de langue : Français, Anglais, Espagnol, Japonais
 - 🛠️ Paramétrage dynamique du nombre de documents récupérés (`top_k`)
 - 📝 Feedback utilisateur avec `st.radio` et enregistrement en base SQLite
+- 🔐 Connexion sécurisée à **Azure OpenAI** pour le LLM et les embeddings
 
 ---
 
@@ -33,6 +34,8 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+> 🧠 Ce projet utilise **Azure OpenAI** pour accéder aux modèles `gpt-35-turbo` et `text-embedding-ada-002`. Les paramètres API sont stockés localement dans un fichier `config.toml` (non inclus dans le dépôt).
+
 ---
 
 ## 🗄️ Structure du projet
@@ -43,12 +46,34 @@ projet-RAG/
 ├── app.py                      # Application principale Streamlit
 ├── requirements.txt           # Dépendances Python
 ├── README.md                  # Ce fichier
-├── secrets/                   # Informations d'API (non incluses)
+├── samples/                   # Fichiers PDF de démonstration
 ├── rag/
 │   ├── langchain.py           # Pipeline utilisant LangChain
 │   └── llamaindex.py          # Pipeline utilisant LlamaIndex
-└── feedback.db                # (généré automatiquement) base SQLite pour le feedback
+├── pages/feedback.py          # Page dédiée à l'analyse des retours utilisateur
+└── feedback.db                # Base SQLite pour stocker les feedbacks
 ```
+
+---
+
+## 🔐 Configuration locale
+
+Créer un fichier `config.toml` (non versionné) contenant vos identifiants Azure OpenAI :
+
+```toml
+[chat]
+azure_deployment = "gpt-chat"
+azure_api_key = "sk-..."
+azure_endpoint = "https://projet-rag-openai.azure.com/"
+azure_api_version = "2023-12-01-preview"
+
+[embedding]
+azure_deployment = "embed-ada"
+azure_api_key = "sk-..."
+azure_endpoint ="https://projet-rag-openai.azure.com/"
+azure_api_version = "2023-12-01-preview"
+```
+
 
 ---
 
@@ -56,8 +81,7 @@ projet-RAG/
 
 1. Crée un compte sur https://streamlit.io/cloud
 2. Connecte ton dépôt GitHub
-3. Déploie l'application avec `streamlit run app.py`
-4. Crée un fichier `.streamlit/secrets.toml` pour stocker tes clés API Azure OpenAI
+3. Ajoute tes secrets dans `Settings > Secrets` de l'app
 
 ---
 
@@ -65,4 +89,4 @@ projet-RAG/
 
 Pour toute question, contactez [Larak01](https://github.com/Larak01).
 
-Bon RAG ! 🎉
+Bon RAG avec Azure OpenAI ! 🎉
