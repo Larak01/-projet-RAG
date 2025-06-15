@@ -18,17 +18,21 @@ CHUNK_OVERLAP = 200
 config = toml.load("config.toml")
 
 embedder = AzureOpenAIEmbeddings(
+    model=config["embedding"]["azure_deployment"]
     azure_endpoint=config["embedding"]["azure_endpoint"],
     azure_deployment=config["embedding"]["azure_deployment"],
     openai_api_version=config["embedding"]["azure_api_version"],
+    api_version=config["embedding"]["azure_api_version"]
 )
 
 vector_store = InMemoryVectorStore(embedder)
 
 llm = AzureChatOpenAI(
+    model=config["embedding"]["azure_deployment"]
     azure_endpoint=config["chat"]["azure_endpoint"],
     azure_deployment=config["chat"]["azure_deployment"],
     openai_api_version=config["chat"]["azure_api_version"],
+    api_version=config["embedding"]["azure_api_version"]
 )
 
 def get_meta_doc(extract: str) -> str:
