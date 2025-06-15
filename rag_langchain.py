@@ -5,7 +5,7 @@ from datetime import datetime
 from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-ffrom langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 
 from langchain_openai import AzureOpenAIEmbeddings
