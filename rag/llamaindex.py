@@ -9,6 +9,7 @@ from llama_index.core.schema import TextNode
 from llama_index.core.vector_stores import SimpleVectorStore
 from llama_index.core.vector_stores import VectorStoreQuery
 from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
+
 from llama_index.llms.azure_openai import AzureOpenAI
 from llama_index.readers.file import PyMuPDFReader
 
@@ -26,12 +27,14 @@ llm = AzureOpenAI(
     api_version=config["chat"]["azure_api_version"]
 )
 
-embedder = AzureOpenAIEmbeddings(
+embedder = AzureOpenAIEmbedding(
+    model=config["embedding"]["azure_deployment"],
+    deployment_name=config["embedding"]["azure_deployment"],
     azure_endpoint=config["embedding"]["azure_endpoint"],
-    azure_deployment=config["embedding"]["azure_deployment"],
-    api_version=config["embedding"]["azure_api_version"],          # ✅
-    api_key=config["embedding"]["azure_api_key"]
+    api_key=config["embedding"]["azure_api_key"],
+    api_version=config["embedding"]["azure_api_version"]
 )
+
 
 
 Settings.llm = llm
