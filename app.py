@@ -1,7 +1,10 @@
 import streamlit as st
+import sqlite3
+import pandas as pd
 from langchain import answer_question as answer_lc, store_pdf_file as store_lc
 from llamaindex import answer_question as answer_ll, store_pdf_file as store_ll
 import tempfile
+from datetime import datetime
 
 # --- UI Setup ---
 st.set_page_config(page_title="Projet RAG", layout="centered")
@@ -52,6 +55,11 @@ if st.button("Poser la question"):
                 reponse = answer_ll(question_utilisateur, language=langue_cible, top_k=top_k)
         st.success("Réponse générée :")
         st.markdown(reponse)
+
+        # --- Feedback utilisateur via st.feedback ---
+        feedback = st.feedback("Que pensez-vous de cette réponse ?", key="feedback_widget")
+        if feedback:
+            print("Feedback utilisateur :", feedback)
 
 # --- Footer ---
 st.markdown("---")
