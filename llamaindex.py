@@ -1,104 +1,84 @@
-import yaml
+import streamlit as st
+import sqlite3
+import pandas as pd
+from langchain import answer_question as answer_lc, store_pdf_file as store_lc
+from llamaindex import answer_question as answer_ll, store_pdf_file as store_ll
+import tempfile
 from datetime import datetime
 
-from llama_index.core import Settings
-from llama_index.core.node_parser import SentenceSplitter
-from llama_index.core.schema import TextNode
-from llama_index.core.vector_stores import SimpleVectorStore, VectorStoreQuery
-from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
-from llama_index.llms.azure_openai import AzureOpenAI
-from llama_index.readers.file import PyMuPDFReader
+# --- UI Setup ---
+st.set_page_config(page_title="Projet RAG", layout="centered")
+st.title("📚 RAG : Retrieval-Augmented Generation")
 
-CHUNK_SIZE = 1_000
-CHUNK_OVERLAP = 200
+# --- Choix du framework ---
+framework = st.radio("Choisissez le moteur RAG", ["LangChain", "LlamaIndex"], horizontal=True)
 
-def read_config(file_path):
-    with open(file_path, 'r') as file:
-        try:
-            config = yaml.safe_load(file)
-            return config
-        except yaml.YAMLError as e:
-            print(f"Error reading YAML file: {e}")
-            return None
+# --- Choix de la langue ---
+langue = st.selectbox("Choisissez la langue de réponse", ["Français", "Anglais", "Espagnol", "Japonais"])
+lang_codes = {
+    "Français": "French",
+    "Anglais": "English",
+    "Espagnol": "Spanish",
+    "Japonais": "Japanese"
+}
+langue_cible = lang_codes[langue]
 
-config = read_config("secrets/config.yaml")
+# --- Choix du top_k ---
+top_k = st.slider("Nombre de documents similaires à récupérer", min_value=1, max_value=10, value=5)
 
-llm = AzureOpenAI(
-    model=config["chat"]["azure_deployment"],
-    deployment_name=config["chat"]["azure_deployment"],
-    api_key=config["chat"]["azure_api_key"],
-    azure_endpoint=config["chat"]["azure_endpoint"],
-    api_version=config["chat"]["azure_api_version"],
-)
+# --- Upload de PDF ---
+uploaded_file = st.file_uploader("Téléversez un fichier PDF", type="pdf")
+if uploaded_file is not None:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+        tmp_file.write(uploaded_file.read())
+        tmp_path = tmp_file.name
 
-embedder = AzureOpenAIEmbedding(
-    model=config["embedding"]["azure_deployment"],
-    deployment_name=config["embedding"]["azure_deployment"],
-    api_key=config["embedding"]["azure_api_key"],
-    azure_endpoint=config["embedding"]["azure_endpoint"],
-    api_version=config["embedding"]["azure_api_version"],
-)
+    st.info(f"Indexation du fichier : {uploaded_file.name} avec {framework}")
+    if framework == "LangChain":
+        store_lc(tmp_path, uploaded_file.name)
+    else:
+        store_ll(tmp_path, uploaded_file.name)
+    st.success("Fichier indexé avec succès !")
 
-Settings.llm = llm
-Settings.embed_model = embedder
+# --- Zone de question ---
+question_utilisateur = st.text_area("Posez votre question", "")
 
-vector_store = SimpleVectorStore()
+# --- Traitement ---
+if st.button("Poser la question"):
+    if question_utilisateur.strip() == "":
+        st.warning("Veuillez entrer une question.")
+    else:
+        with st.spinner("Génération de la réponse..."):
+            if framework == "LangChain":
+                reponse = answer_lc(question_utilisateur, language=langue_cible, top_k=top_k)
+            else:
+                reponse = answer_ll(question_utilisateur, language=langue_cible, top_k=top_k)
+        st.success("Réponse générée :")
+        st.markdown(reponse)
 
-def store_pdf_file(file_path: str, doc_name: str):
-    loader = PyMuPDFReader()
-    documents = loader.load(file_path)
+        # --- Feedback utilisateur ---
+        feedback = st.radio("Êtes-vous satisfait de la réponse ?", ["👍 Oui", "👎 Non"])
+        if st.button("Enregistrer le feedback"):
+            try:
+                conn = sqlite3.connect("feedback.db")
+                cursor = conn.cursor()
+                cursor.execute('''CREATE TABLE IF NOT EXISTS feedbacks (
+                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                    question TEXT,
+                                    reponse TEXT,
+                                    satisfaction TEXT,
+                                    timestamp TEXT
+                                )''')
+                conn.commit()
+                cursor.execute("INSERT INTO feedbacks (question, reponse, satisfaction, timestamp) VALUES (?, ?, ?, ?)",
+                               (question_utilisateur, reponse, feedback, datetime.now().isoformat()))
+                conn.commit()
+                conn.close()
+                st.success("Feedback enregistré avec succès ✅")
+            except Exception as e:
+                st.error("Erreur lors de l'enregistrement du feedback")
+                st.code(str(e))
 
-    text_parser = SentenceSplitter(chunk_size=CHUNK_SIZE)
-    text_chunks = []
-    doc_idxs = []
-    for doc_idx, doc in enumerate(documents):
-        cur_text_chunks = text_parser.split_text(doc.text)
-        text_chunks.extend(cur_text_chunks)
-        doc_idxs.extend([doc_idx] * len(cur_text_chunks))
-
-    nodes = []
-    for idx, text_chunk in enumerate(text_chunks):
-        node = TextNode(text=text_chunk)
-        src_doc = documents[doc_idxs[idx]]
-        node.metadata = src_doc.metadata
-        nodes.append(node)
-
-    for node in nodes:
-        node_embedding = embedder.get_text_embedding(node.get_content(metadata_mode="all"))
-        node.embedding = node_embedding
-
-    vector_store.add(nodes)
-    return
-
-def retrieve(question: str, top_k: int = 5):
-    query_embedding = embedder.get_query_embedding(question)
-    query_mode = "default"
-
-    vector_store_query = VectorStoreQuery(
-        query_embedding=query_embedding,
-        similarity_top_k=top_k,
-        mode=query_mode
-    )
-
-    query_result = vector_store.query(vector_store_query)
-    return query_result.nodes
-
-def build_qa_messages(question: str, context: str, language: str) -> list[str]:
-    messages = [
-        ("system", "You are an assistant for question-answering tasks."),
-        ("system", f"""Use the following pieces of retrieved context to answer the question.
-Answer in {language}.
-If you don't know the answer, just say that you don't know.
-Use three sentences maximum and keep the answer concise.
-
-{context}"""),
-        ("user", question)
-    ]
-    return messages
-
-def answer_question(question: str, language: str = "English", top_k: int = 5) -> str:
-    docs = retrieve(question, top_k=top_k)
-    docs_content = "\n\n".join(doc.get_content() for doc in docs)
-    messages = build_qa_messages(question, docs_content, language)
-    response = llm.invoke(messages)
-    return response.content
+# --- Footer ---
+st.markdown("---")
+st.markdown("Projet RAG  — 2025")
