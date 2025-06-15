@@ -1,38 +1,31 @@
-import toml
 import streamlit as st
 from datetime import datetime
-
-from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_core.documents import Document
-from langchain_openai import AzureOpenAIEmbeddings
-from langchain_openai import AzureOpenAIEmbeddings
-from langchain_openai import AzureChatOpenAI
+from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
 
 CHUNK_SIZE = 1_000
 CHUNK_OVERLAP = 200
 
-# Lecture depuis config.toml
-config = toml.load("config.toml")
+# Lecture depuis st.secrets (Streamlit Cloud)
+config = st.secrets
 
 embedder = AzureOpenAIEmbeddings(
     azure_endpoint=config["embedding"]["azure_endpoint"],
     azure_deployment=config["embedding"]["azure_deployment"],
-    api_version=config["embedding"]["azure_api_version"],  # ✅ OK
+    api_version=config["embedding"]["azure_api_version"],
     api_key=config["embedding"]["azure_api_key"]
 )
-
-
 
 vector_store = InMemoryVectorStore(embedder)
 
 llm = AzureChatOpenAI(
     azure_endpoint=config["chat"]["azure_endpoint"],
     azure_deployment=config["chat"]["azure_deployment"],
-    api_version=config["chat"]["azure_api_version"],        # ✅ CORRECT
-    api_key=config["chat"]["azure_api_key"]                 # ✅ OBLIGATOIRE
+    api_version=config["chat"]["azure_api_version"],
+    api_key=config["chat"]["azure_api_key"]
 )
 
 def get_meta_doc(extract: str) -> str:
