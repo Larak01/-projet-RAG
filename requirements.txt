@@ -12,3 +12,4 @@ PyMuPDF==1.23.21
 azure-core==1.29.4
 azure-identity==1.15.0
 faiss-cpu==1.7.4
+pyyaml
