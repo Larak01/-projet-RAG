@@ -1,6 +1,4 @@
-import streamlit as st
 from datetime import datetime
-
 from llama_index.core import VectorStoreIndex, Settings
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import TextNode
@@ -12,21 +10,21 @@ from llama_index.readers.file import PyMuPDFReader
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 
-# ✅ Lecture des credentials sécurisés depuis Streamlit Cloud
+# ✅ Configuration manuelle sans secrets
 llm = AzureOpenAI(
-    model=st.secrets["chat"]["azure_deployment"],
-    deployment_name=st.secrets["chat"]["azure_deployment"],
-    api_key=st.secrets["chat"]["azure_api_key"],
-    azure_endpoint=st.secrets["chat"]["azure_endpoint"],
-    api_version=st.secrets["chat"]["azure_api_version"],
+    model="gpt-35-turbo",
+    deployment_name="gpt-35-turbo",
+    api_key="sk-votre-cle-api-chat",
+    azure_endpoint="https://votre-instance.openai.azure.com",
+    api_version="2024-02-15",
 )
 
 embedder = AzureOpenAIEmbedding(
-    model=st.secrets["embedding"]["azure_deployment"],
-    deployment_name=st.secrets["embedding"]["azure_deployment"],
-    api_key=st.secrets["embedding"]["azure_api_key"],
-    azure_endpoint=st.secrets["embedding"]["azure_endpoint"],
-    api_version=st.secrets["embedding"]["azure_api_version"],
+    model="text-embedding-ada-002",
+    deployment_name="text-embedding-ada-002",
+    api_key="sk-votre-cle-api-embedding",
+    azure_endpoint="https://votre-instance.openai.azure.com",
+    api_version="2024-02-15",
 )
 
 Settings.llm = llm
@@ -64,14 +62,11 @@ def store_pdf_file(file_path: str, doc_name: str):
 
 def retrieve(question: str):
     query_embedding = embedder.get_query_embedding(question)
-    query_mode = "default"
-
     vector_store_query = VectorStoreQuery(
         query_embedding=query_embedding,
         similarity_top_k=5,
-        mode=query_mode
+        mode="default"
     )
-
     result = vector_store.query(vector_store_query)
     return result.nodes
 
