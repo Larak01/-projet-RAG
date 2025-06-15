@@ -1,22 +1,6 @@
-streamlit==1.32.0
-
-# Core dependencies
-pyyaml==6.0.1
-tiktoken
-
-# LangChain stack
+streamlit
 langchain==0.1.14
 langchain-openai==0.1.5
-faiss-cpu==1.7.4
-PyMuPDF==1.23.21
-
-# LlamaIndex stack
-llama-index==0.10.20
-llama-index-embeddings-azure-openai==0.1.6
-llama-index-llms-azure-openai==0.1.5
-llama-index-readers-file==0.1.4
-
-# Azure SDK
-openai>=1.10.0,<2.0.0
-azure-core==1.29.4
-azure-identity==1.15.0
+PyMuPDF
+faiss-cpu
+sqlite3
