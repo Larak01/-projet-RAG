@@ -1,111 +1,98 @@
-# ✅ Final version of the main application file with all required updates
-
-import os
-import tempfile
 import streamlit as st
-import pandas as pd
-import sqlite3
-import glob
+from datetime import datetime
 
-from rag.langchain import answer_question as answer_langchain
-from rag.llamaindex import answer_question as answer_llamaindex
-from rag.langchain import store_pdf_file as store_pdf_langchain
-from rag.llamaindex import store_pdf_file as store_pdf_llamaindex
-from rag.langchain import delete_file_from_store as delete_file_langchain
-from rag.llamaindex import delete_file_from_store as delete_file_llamaindex
+from llama_index.core import Settings
+from llama_index.core.node_parser import SentenceSplitter
+from llama_index.core.schema import TextNode
+from llama_index.core.vector_stores import SimpleVectorStore
+from llama_index.core.vector_stores import VectorStoreQuery
+from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
+from llama_index.llms.azure_openai import AzureOpenAI
+from llama_index.readers.file import PyMuPDFReader
 
-st.set_page_config(
-    page_title="Analyse de documents",
-    page_icon="📄",
+CHUNK_SIZE = 1_000
+CHUNK_OVERLAP = 200
+
+llm = AzureOpenAI(
+    model=st.secrets["chat_azure_deployment"],
+    deployment_name=st.secrets["chat_azure_deployment"],
+    api_key=st.secrets["chat_azure_api_key"],
+    azure_endpoint=st.secrets["chat_azure_endpoint"],
+    api_version=st.secrets["chat_azure_api_version"]
 )
 
-if 'stored_files' not in st.session_state:
-    st.session_state['stored_files'] = []
+embedder = AzureOpenAIEmbedding(
+    model="text-embedding-ada-002",
+    deployment_name=st.secrets["embedding_azure_deployment"],
+    azure_endpoint=st.secrets["embedding_azure_endpoint"],
+    api_key=st.secrets["embedding_azure_api_key"],
+    api_version=st.secrets["embedding_azure_api_version"]
+)
 
-# SQLite DB initialization
-conn = sqlite3.connect("feedback.db", check_same_thread=False)
-cursor = conn.cursor()
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS feedback (
-        question TEXT,
-        answer TEXT,
-        rating TEXT
+Settings.llm = llm
+Settings.embed_model = embedder
+
+vector_store = SimpleVectorStore()
+
+def store_pdf_file(file_path: str, doc_name: str):
+    loader = PyMuPDFReader()
+    documents = loader.load(file_path)
+
+    text_parser = SentenceSplitter(chunk_size=CHUNK_SIZE)
+    text_chunks = []
+    doc_idxs = []
+    for doc_idx, doc in enumerate(documents):
+        cur_text_chunks = text_parser.split_text(doc.text)
+        text_chunks.extend(cur_text_chunks)
+        doc_idxs.extend([doc_idx] * len(cur_text_chunks))
+
+    nodes = []
+    for idx, text_chunk in enumerate(text_chunks):
+        node = TextNode(text=text_chunk)
+        src_doc = documents[doc_idxs[idx]]
+        node.metadata = src_doc.metadata
+        nodes.append(node)
+
+    for node in nodes:
+        node_embedding = embedder.get_text_embedding(node.get_content(metadata_mode="all"))
+        node.embedding = node_embedding
+
+    vector_store.add(nodes)
+    return
+
+def delete_file_from_store(name: str) -> int:
+    raise NotImplementedError('function not implemented for Llamaindex')
+
+def inspect_vector_store(top_n: int=10) -> list:
+    raise NotImplementedError('function not implemented for Llamaindex')
+
+def get_vector_store_info():
+    raise NotImplementedError('function not implemented for Llamaindex')
+
+def retrieve(question: str):
+    query_embedding = embedder.get_query_embedding(question)
+
+    vector_store_query = VectorStoreQuery(
+        query_embedding=query_embedding, similarity_top_k=5, mode="default"
     )
-''')
-conn.commit()
 
-def load_sample_pdfs(framework, samples_dir="samples"):
-    sample_paths = glob.glob(f"{samples_dir}/*.pdf")
-    for path in sample_paths:
-        file_name = os.path.basename(path)
-        if file_name not in st.session_state['stored_files']:
-            if framework == "LangChain":
-                store_pdf_langchain(path, file_name)
-            else:
-                store_pdf_llamaindex(path, file_name)
-            st.session_state['stored_files'].append(file_name)
+    query_result = vector_store.query(vector_store_query)
+    return query_result.nodes
 
-def main():
-    st.title("🧠 Analyse de documents enrichie")
-    st.subheader("Chargez vos PDF, interrogez-les, et laissez un avis.")
+def build_qa_messages(question: str, context: str) -> list[str]:
+    messages = [
+        ("system", "You are an assistant for question-answering tasks."),
+        ("system", f"""Use the following pieces of retrieved context to answer the question.
+        If you don't know the answer, just say that you don't know.
+        Use three sentences maximum and keep the answer concise.
+        {context}"""),
+        ("user", question)
+    ]
+    return messages
 
-    # Langue de réponse
-    lang = st.selectbox("🌐 Choisissez la langue de réponse", ["Français", "Anglais", "Espagnol", "Japonais"])
-
-    # Choix du framework
-    framework = st.radio("🧰 Choisissez le framework d'indexation", ["LangChain", "LlamaIndex"])
-
-    # Nombre de documents à récupérer
-    k = st.slider("📄 Nombre de documents à considérer pour la réponse", min_value=1, max_value=10, value=5)
-
-    # Charger les articles PDF de base
-    load_sample_pdfs(framework)
-
-    uploaded_files = st.file_uploader("📂 Déposez vos fichiers ici", type=['pdf'], accept_multiple_files=True)
-
-    file_info = []
-    if uploaded_files:
-        for f in uploaded_files:
-            size_in_kb = len(f.getvalue()) / 1024
-            file_info.append({"Nom du fichier": f.name, "Taille (KB)": f"{size_in_kb:.2f}"})
-            if f.name.endswith('.pdf') and f.name not in st.session_state['stored_files']:
-                temp_dir = tempfile.mkdtemp()
-                path = os.path.join(temp_dir, f.name)
-                with open(path, "wb") as outfile:
-                    outfile.write(f.read())
-                if framework == "LangChain":
-                    store_pdf_langchain(path, f.name)
-                else:
-                    store_pdf_llamaindex(path, f.name)
-                st.session_state['stored_files'].append(f.name)
-
-        st.table(pd.DataFrame(file_info))
-
-    files_to_be_deleted = set(st.session_state['stored_files']) - {f['Nom du fichier'] for f in file_info}
-    for name in files_to_be_deleted:
-        st.session_state['stored_files'].remove(name)
-        if framework == "LangChain":
-            delete_file_langchain(name)
-        else:
-            delete_file_llamaindex(name)
-
-    question = st.text_input("❓ Posez votre question")
-
-    if st.button("Analyser") and question:
-        if framework == "LangChain":
-            response = answer_langchain(question)
-        else:
-            response = answer_llamaindex(question)
-
-        st.text_area("🧾 Réponse générée", value=response, height=200)
-
-        rating = st.radio("📝 Évaluez cette réponse", ["👍 Pertinente", "👎 Peu utile"])
-        if st.button("Soumettre l'avis"):
-            cursor.execute("INSERT INTO feedback (question, answer, rating) VALUES (?, ?, ?)", (question, response, rating))
-            conn.commit()
-            st.success("Merci pour votre retour !")
-    else:
-        st.text_area("🧾 Réponse générée", value="", height=200)
-
-if __name__ == "__main__":
-    main()
+def answer_question(question: str) -> str:
+    docs = retrieve(question)
+    docs_content = "\n\n".join(doc.get_content() for doc in docs)
+    messages = build_qa_messages(question, docs_content)
+    response = llm.invoke(messages)
+    return response.content
