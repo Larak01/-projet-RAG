@@ -1,7 +1,6 @@
-import yaml
+import toml
 import streamlit as st
 from datetime import datetime
-import toml
 
 from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders import PyMuPDFLoader
@@ -12,31 +11,11 @@ from langchain_core.documents import Document
 from langchain_openai import AzureOpenAIEmbeddings
 from langchain_openai import AzureChatOpenAI
 
-
 CHUNK_SIZE = 1_000
 CHUNK_OVERLAP = 200
 
-
-def read_config(file_path):
-    with open(file_path, 'r') as file:
-        try:
-            config = yaml.safe_load(file)
-            return config
-        except yaml.YAMLError as e:
-            print(f"Error reading YAML file: {e}")
-            return None
-
-
-
+# Lecture depuis config.toml
 config = toml.load("config.toml")
-
-embedder = AzureOpenAIEmbeddings(
-    azure_endpoint=config["embedding"]["azure_endpoint"],
-    azure_deployment=config["embedding"]["azure_deployment"],
-    openai_api_version=config["embedding"]["azure_api_version"],
-    api_key=config["embedding"]["azure_api_key"]
-)
-
 
 embedder = AzureOpenAIEmbeddings(
     azure_endpoint=config["embedding"]["azure_endpoint"],
@@ -51,21 +30,13 @@ llm = AzureChatOpenAI(
     azure_endpoint=config["chat"]["azure_endpoint"],
     azure_deployment=config["chat"]["azure_deployment"],
     openai_api_version=config["chat"]["azure_api_version"],
-    api_key=config["chat"]["azure_api_key"],
+    api_key=config["chat"]["azure_api_key"]
 )
 
-
 def get_meta_doc(extract: str) -> str:
-    """Generate a synthetic metadata description of the content.
-    """
     messages = [
-    (
-        "system",
-        "You are a librarian extracting metadata from documents.",
-    ),
-    (
-        "user",
-        """Extract from the content the following metadata.
+        ("system", "You are a librarian extracting metadata from documents."),
+        ("user", f"""Extract from the content the following metadata.
         Answer 'unknown' if you cannot find or generate the information.
         Metadata list:
         - title
@@ -76,42 +47,34 @@ def get_meta_doc(extract: str) -> str:
         - themes as a list of keywords
 
         <content>
-        {}
+        {extract}
         </content>
-        """.format(extract),
-    ),]
+        """)
+    ]
     response = llm.invoke(messages)
     return response.content
 
-
 def store_pdf_file(file_path: str, doc_name: str, use_meta_doc: bool=True):
-    """Store a pdf file in the vector store.
-
-    Args:
-        file_path (str): file path to the PDF file
-    """
     loader = PyMuPDFLoader(file_path)
     docs = loader.load()
-    # TODO: make a constant of chunk_size and chunk_overlap
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE,
-                                                   chunk_overlap=CHUNK_OVERLAP)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
     all_splits = text_splitter.split_documents(docs)
     for split in all_splits:
         split.metadata = {
             'document_name': doc_name,
             'insert_date': datetime.now()
-            }
+        }
     if use_meta_doc:
         extract = '\n\n'.join([split.page_content for split in all_splits[:min(10, len(all_splits))]])
-        meta_doc = Document(page_content=get_meta_doc(extract),
-                            metadata={
-                                'document_name': doc_name,
-                                'insert_date': datetime.now()
-                                })
+        meta_doc = Document(
+            page_content=get_meta_doc(extract),
+            metadata={
+                'document_name': doc_name,
+                'insert_date': datetime.now()
+            })
         all_splits.append(meta_doc)
     _ = vector_store.add_documents(documents=all_splits)
     return
-
 
 def delete_file_from_store(name: str) -> int:
     ids_to_remove = []
@@ -119,9 +82,7 @@ def delete_file_from_store(name: str) -> int:
         if name == doc['metadata']['document_name']:
             ids_to_remove.append(id)
     vector_store.delete(ids_to_remove)
-    #print('File deleted:', name)
     return len(ids_to_remove)
-
 
 def inspect_vector_store(top_n: int=10) -> list:
     docs = []
@@ -132,13 +93,10 @@ def inspect_vector_store(top_n: int=10) -> list:
                 'document_name': doc['metadata']['document_name'],
                 'insert_date': doc['metadata']['insert_date'],
                 'text': doc['text']
-                })
-            # docs have keys 'id', 'vector', 'text', 'metadata'
-            # print(f"{id} {doc['metadata']['document_name']}: {doc['text']}")
+            })
         else:
             break
     return docs
-
 
 def get_vector_store_info():
     nb_docs = 0
@@ -158,49 +116,22 @@ def get_vector_store_info():
         'nb_documents': len(documents)
     }
 
-
 def retrieve(question: str):
-    """Retrieve documents similar to a question.
-
-    Args:
-        question (str): text of the question
-
-    Returns:
-        list[TODO]: list of similar documents retrieved from the vector store
-    """
     retrieved_docs = vector_store.similarity_search(question)
     return retrieved_docs
 
-
 def build_qa_messages(question: str, context: str) -> list[str]:
     messages = [
-    (
-        "system",
-        "You are an assistant for question-answering tasks.",
-    ),
-    (
-        "system",
-        """Use the following pieces of retrieved context to answer the question.
+        ("system", "You are an assistant for question-answering tasks."),
+        ("system", f"""Use the following pieces of retrieved context to answer the question.
         If you don't know the answer, just say that you don't know.
         Use three sentences maximum and keep the answer concise.
-        {}""".format(context),
-    ),
-    (  
-        "user",
-        question
-    ),]
+        {context}"""),
+        ("user", question)
+    ]
     return messages
 
-
 def answer_question(question: str) -> str:
-    """Answer a question by retrieving similar documents in the store.
-
-    Args:
-        question (str): text of the question
-
-    Returns:
-        str: text of the answer
-    """
     inspect_vector_store()
     docs = retrieve(question)
     docs_content = "\n\n".join(doc.page_content for doc in docs)
@@ -213,4 +144,3 @@ def answer_question(question: str) -> str:
     messages = build_qa_messages(question, docs_content)
     response = llm.invoke(messages)
     return response.content
-
