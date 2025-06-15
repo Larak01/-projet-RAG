@@ -21,7 +21,14 @@ df = pd.DataFrame(data, columns=["Question", "Réponse", "Évaluation"])
 if df.empty:
     st.info("Aucun feedback collecté pour l'instant.")
 else:
+    st.subheader("🔎 Filtrer par évaluation")
+    filtre = st.radio("Choisissez un type d'avis", ["Tous", "👍 Pertinente", "👎 Peu utile"])
+
+    if filtre != "Tous":
+        df = df[df["Évaluation"] == filtre]
+
     st.dataframe(df, use_container_width=True)
 
     st.subheader("📈 Statistiques")
-    st.bar_chart(df["Évaluation"].value_counts())
+    stats = df["Évaluation"].value_counts().rename_axis("Évaluation").reset_index(name="Nombre")
+    st.bar_chart(stats.set_index("Évaluation"))
