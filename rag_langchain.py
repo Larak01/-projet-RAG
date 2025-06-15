@@ -99,7 +99,7 @@ def store_pdf_file(file_path: str, doc_name: str, use_meta_doc: bool=True):
                                 'insert_date': datetime.now()
                                 })
         all_splits.append(meta_doc)
-     = vector_store.add_documents(all_splits)
+        vector_store.add_documents(all_splits)
 
     return
 
