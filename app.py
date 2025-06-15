@@ -1,73 +1,55 @@
 import streamlit as st
-import os
-import sqlite3
-from datetime import datetime
+from langchain import answer_question as answer_lc, store_pdf_file as store_lc
+from llamaindex import answer_question as answer_ll, store_pdf_file as store_ll
+import tempfile
 
-from langchain_community.document_loaders import PyMuPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-from langchain.embeddings.fake import FakeEmbeddings
-from langchain.llms.fake import FakeListLLM
-from langchain_core.documents import Document
+# --- UI Setup ---
+st.set_page_config(page_title="Projet RAG", layout="centered")
+st.title("📚 RAG : Retrieval-Augmented Generation")
 
-# 📁 Dossier pour les fichiers
-os.makedirs("uploaded_docs", exist_ok=True)
+# --- Choix du framework ---
+framework = st.radio("Choisissez le moteur RAG", ["LangChain", "LlamaIndex"], horizontal=True)
 
-# 🧠 Simule les embeddings + LLM
-embedder = FakeEmbeddings()
-llm = FakeListLLM(responses=["Ceci est une réponse factice."])
-vector_store = FAISS.from_documents([], embedder)
-
-# 🔢 Paramètres
-CHUNK_SIZE = 1000
-CHUNK_OVERLAP = 200
-
-# 🧩 Langue de réponse
-langue_map = {
-    "Français": "Réponds en français.",
-    "Anglais": "Respond in English.",
-    "Espagnol": "Responde en español.",
-    "Japonais": "日本語で答えてください。"
+# --- Choix de la langue ---
+langue = st.selectbox("Choisissez la langue de réponse", ["Français", "Anglais", "Espagnol", "Japonais"])
+lang_codes = {
+    "Français": "French",
+    "Anglais": "English",
+    "Espagnol": "Spanish",
+    "Japonais": "Japanese"
 }
+langue_cible = lang_codes[langue]
 
-# 🧠 Indexation PDF
-def store_pdf_file(file_path: str, doc_name: str):
-    loader = PyMuPDFLoader(file_path)
-    docs = loader.load()
+# --- Upload de PDF ---
+uploaded_file = st.file_uploader("Téléversez un fichier PDF", type="pdf")
+if uploaded_file is not None:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+        tmp_file.write(uploaded_file.read())
+        tmp_path = tmp_file.name
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
-    chunks = splitter.split_documents(docs)
+    st.info(f"Indexation du fichier : {uploaded_file.name} avec {framework}")
+    if framework == "LangChain":
+        store_lc(tmp_path, uploaded_file.name)
+    else:
+        store_ll(tmp_path, uploaded_file.name)
+    st.success("Fichier indexé avec succès !")
 
-    for chunk in chunks:
-        chunk.metadata = {
-            "document_name": doc_name,
-            "insert_date": datetime.now()
-        }
+# --- Zone de question ---
+question_utilisateur = st.text_area("Posez votre question", "")
 
-    vector_store.add_documents(chunks)
+# --- Traitement ---
+if st.button("Poser la question"):
+    if question_utilisateur.strip() == "":
+        st.warning("Veuillez entrer une question.")
+    else:
+        with st.spinner("Génération de la réponse..."):
+            if framework == "LangChain":
+                reponse = answer_lc(question_utilisateur, language=langue_cible)
+            else:
+                reponse = answer_ll(question_utilisateur, language=langue_cible)
+        st.success("Réponse générée :")
+        st.markdown(reponse)
 
-# 🔍 Recherche
-def answer_question(question: str, langue: str):
-    context_docs = vector_store.similarity_search(question, k=5)
-    context = "\n\n".join(doc.page_content for doc in context_docs)
-    prompt = f"{langue_map[langue]}\n\nContexte:\n{context}\n\nQuestion: {question}"
-    return llm.invoke(prompt)
-
-# 🖼️ UI
-st.title("📚 Assistant RAG - Projet MAG3")
-langue = st.selectbox("Langue de la réponse :", list(langue_map.keys()))
-uploaded_file = st.file_uploader("Déposez un fichier PDF", type=["pdf"])
-
-if uploaded_file:
-    file_path = os.path.join("uploaded_docs", uploaded_file.name)
-    with open(file_path, "wb") as f:
-        f.write(uploaded_file.read())
-    st.success("Fichier chargé.")
-    store_pdf_file(file_path, uploaded_file.name)
-
-question = st.text_input("Posez votre question :")
-if question:
-    with st.spinner("Réflexion en cours..."):
-        reponse = answer_question(question, langue)
-        st.markdown("### Réponse :")
-        st.write(reponse)
+# --- Footer ---
+st.markdown("---")
+st.markdown("Projet RAG  — 2025")
