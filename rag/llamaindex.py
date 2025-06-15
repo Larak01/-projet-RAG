@@ -1,4 +1,3 @@
-import toml
 import streamlit as st
 from datetime import datetime
 
@@ -9,15 +8,14 @@ from llama_index.core.schema import TextNode
 from llama_index.core.vector_stores import SimpleVectorStore
 from llama_index.core.vector_stores import VectorStoreQuery
 from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
-
 from llama_index.llms.azure_openai import AzureOpenAI
 from llama_index.readers.file import PyMuPDFReader
 
 CHUNK_SIZE = 1_000
 CHUNK_OVERLAP = 200
 
-# Lecture des paramètres depuis config.toml
-config = toml.load("config.toml")
+# Lecture des paramètres depuis st.secrets
+config = st.secrets
 
 llm = AzureOpenAI(
     model=config["chat"]["azure_deployment"],
@@ -29,14 +27,11 @@ llm = AzureOpenAI(
 
 embedder = AzureOpenAIEmbedding(
     model="text-embedding-ada-002",  
-    deployment_name=config["embedding"]["azure_deployment"],  # ex: "embed-ada"
+    deployment_name=config["embedding"]["azure_deployment"],
     azure_endpoint=config["embedding"]["azure_endpoint"],
     api_key=config["embedding"]["azure_api_key"],
     api_version=config["embedding"]["azure_api_version"]
 )
-
-
-
 
 Settings.llm = llm
 Settings.embed_model = embedder
@@ -109,4 +104,3 @@ def answer_question(question: str) -> str:
     messages = build_qa_messages(question, docs_content)
     response = llm.invoke(messages)
     return response.content
-
