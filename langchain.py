@@ -2,7 +2,7 @@ import yaml
 from datetime import datetime
 
 from langchain_community.document_loaders import TextLoader, PyMuPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_core.documents import Document
 
