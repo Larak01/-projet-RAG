@@ -9,24 +9,22 @@ from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
 CHUNK_SIZE = 1_000
 CHUNK_OVERLAP = 200
 
-# Lecture depuis st.secrets (Streamlit Cloud)
-config = st.secrets
+# Utilisation de st.secrets (Streamlit Cloud)
+llm = AzureChatOpenAI(
+    azure_endpoint=st.secrets["chat_azure_endpoint"],
+    azure_deployment=st.secrets["chat_azure_deployment"],
+    api_version=st.secrets["chat_azure_api_version"],
+    api_key=st.secrets["chat_azure_api_key"]
+)
 
 embedder = AzureOpenAIEmbeddings(
-    azure_endpoint=config["embedding"]["azure_endpoint"],
-    azure_deployment=config["embedding"]["azure_deployment"],
-    api_version=config["embedding"]["azure_api_version"],
-    api_key=config["embedding"]["azure_api_key"]
+    azure_endpoint=st.secrets["embedding_azure_endpoint"],
+    azure_deployment=st.secrets["embedding_azure_deployment"],
+    api_version=st.secrets["embedding_azure_api_version"],
+    api_key=st.secrets["embedding_azure_api_key"]
 )
 
 vector_store = InMemoryVectorStore(embedder)
-
-llm = AzureChatOpenAI(
-    azure_endpoint=config["chat"]["azure_endpoint"],
-    azure_deployment=config["chat"]["azure_deployment"],
-    api_version=config["chat"]["azure_api_version"],
-    api_key=config["chat"]["azure_api_key"]
-)
 
 def get_meta_doc(extract: str) -> str:
     messages = [
