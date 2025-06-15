@@ -5,5 +5,8 @@ pymupdf
 streamlit
 PyYAML
 toml
-llama-index[openai]
+llama-index-core
+llama-index-embeddings-azure-openai
+llama-index-llms-azure-openai
+
 
