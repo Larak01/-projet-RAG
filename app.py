@@ -8,7 +8,6 @@ from llamaindex import store_pdf_file as li_store, answer_question as li_answer
 # ✅ Créer le dossier s'il n'existe pas
 os.makedirs("uploaded_docs", exist_ok=True)
 
-# 🧠 Titre principal
 st.title("📚 Assistant Documentaire - Projet RAG")
 
 # Choix du framework
@@ -23,8 +22,14 @@ top_k = st.slider("Nombre de documents similaires à récupérer :", min_value=1
 # Connexion SQLite
 conn = sqlite3.connect("feedback.db")
 c = conn.cursor()
-c.execute('''CREATE TABLE IF NOT EXISTS feedbacks
-             (timestamp TEXT, question TEXT, response TEXT, feedback TEXT)''')
+c.execute("CREATE TABLE IF NOT EXISTS feedbacks (timestamp TEXT, question TEXT, response TEXT, feedback TEXT)")
+
+@st.cache_data
+def cached_store(framework, path, name):
+    if framework == "LangChain":
+        lc_store(path, name)
+    else:
+        li_store(path, name)
 
 # 📥 Upload PDF
 uploaded_file = st.file_uploader("Déposer un fichier PDF", type=["pdf"])
@@ -36,11 +41,13 @@ if uploaded_file is not None:
 
     st.success(f"✅ Fichier {uploaded_file.name} chargé avec succès !")
 
-    # Indexation
-    if framework == "LangChain":
-        lc_store(file_path, uploaded_file.name)
-    else:
-        li_store(file_path, uploaded_file.name)
+    # Indexation avec gestion d'erreur
+    st.write("📥 Indexation en cours...")
+    try:
+        cached_store(framework, file_path, uploaded_file.name)
+        st.success("Indexation réussie.")
+    except Exception as e:
+        st.error(f"Erreur d’indexation : {e}")
 
 # 💬 Question utilisateur
 question = st.text_input("Posez votre question sur le document :")
@@ -53,18 +60,15 @@ langue_map = {
     "Japonais": "日本語で答えてください。"
 }
 
-# Initialisation réponse vide (sécurité feedback)
 response = ""
 
 if question:
     with st.spinner("Recherche de la réponse..."):
         full_question = langue_map.get(langue, "") + "\n" + question
-
         if framework == "LangChain":
             response = lc_answer(full_question, k=top_k)
         else:
             response = li_answer(full_question, k=top_k)
-
         st.markdown("### Réponse :")
         st.write(response)
 
@@ -79,9 +83,6 @@ if feedback and question and response:
     conn.commit()
     st.success("Merci pour votre retour !")
 
-# Fermeture
 conn.close()
-
-# Footer
 st.markdown("---")
 st.caption("Projet MAG 3 — Hands-on RAG — Larak01")
