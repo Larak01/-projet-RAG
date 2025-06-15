@@ -1,10 +1,11 @@
 [chat]
 azure_deployment = "gpt-chat"
+azure_api_key = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 azure_endpoint = "https://projet-rag-openai.openai.azure.com/"
 azure_api_version = "2023-12-01-preview"
 
 [embedding]
 azure_deployment = "embed-ada"
+azure_api_key = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 azure_endpoint = "https://projet-rag-openai.openai.azure.com/"
 azure_api_version = "2023-12-01-preview"
-
