@@ -1,4 +1,4 @@
-import yaml
+import streamlit as st
 from datetime import datetime
 
 from langchain_community.document_loaders import PyMuPDFLoader
@@ -6,115 +6,81 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 
-from langchain_openai import AzureOpenAIEmbeddings
-from langchain_openai import AzureChatOpenAI
+from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
 
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 
+# Configuration avec st.secrets
+embedder = AzureOpenAIEmbeddings(
+    azure_endpoint=st.secrets["embedding"]["azure_endpoint"],
+    azure_deployment=st.secrets["embedding"]["azure_deployment"],
+    openai_api_version=st.secrets["embedding"]["azure_api_version"],
+    api_key=st.secrets["embedding"]["azure_api_key"]
+)
 
-def read_config(file_path):
-    with open(file_path, 'r') as file:
-        try:
-            return yaml.safe_load(file)
-        except yaml.YAMLError as e:
-            print(f"Erreur YAML: {e}")
-            return None
+llm = AzureChatOpenAI(
+    azure_endpoint=st.secrets["chat"]["azure_endpoint"],
+    azure_deployment=st.secrets["chat"]["azure_deployment"],
+    openai_api_version=st.secrets["chat"]["azure_api_version"],
+    api_key=st.secrets["chat"]["azure_api_key"]
+)
 
-config = read_config("secrets/config.yaml")
-
-embedder = AzureOpenAIEmbeddings(**config["embedding"])
-llm = AzureChatOpenAI(**config["chat"])
-
+# Initialisation d'un store vide
 vector_store = FAISS.from_documents([], embedder)
 
 def get_meta_doc(extract: str) -> str:
     messages = [
         ("system", "You are a librarian extracting metadata from documents."),
-        ("user", f"""Extract from the content the following metadata.\nAnswer 'unknown' if you cannot find or generate the information.\nMetadata list:\n- title\n- author\n- source\n- type of content (e.g. scientific paper, literature, news, etc.)\n- language\n- themes as a list of keywords\n\n<content>\n{extract}\n</content>""")
+        ("user", f"""Extract metadata:
+- title
+- author
+- source
+- type (e.g. scientific paper, literature)
+- language
+- themes (as keywords)
+Return 'unknown' if not found.
+
+<content>
+{extract}
+</content>""")
     ]
-    response = llm.invoke(messages)
-    return response.content
+    return llm.invoke(messages).content
 
 def store_pdf_file(file_path: str, doc_name: str, use_meta_doc: bool = True):
     loader = PyMuPDFLoader(file_path)
     docs = loader.load()
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
-    all_splits = text_splitter.split_documents(docs)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
+    all_splits = splitter.split_documents(docs)
+
     for split in all_splits:
         split.metadata = {
-            'document_name': doc_name,
-            'insert_date': datetime.now()
+            "document_name": doc_name,
+            "insert_date": datetime.now()
         }
+
     if use_meta_doc:
         extract = '\n\n'.join([split.page_content for split in all_splits[:min(10, len(all_splits))]])
         meta_doc = Document(
             page_content=get_meta_doc(extract),
-            metadata={'document_name': doc_name, 'insert_date': datetime.now()}
+            metadata={"document_name": doc_name, "insert_date": datetime.now()}
         )
         all_splits.append(meta_doc)
+
     vector_store.add_documents(all_splits)
-
-
-def delete_file_from_store(name: str) -> int:
-    ids_to_remove = []
-    for (id, doc) in vector_store.store.items():
-        if name == doc['metadata']['document_name']:
-            ids_to_remove.append(id)
-    vector_store.delete(ids_to_remove)
-    return len(ids_to_remove)
-
-
-def inspect_vector_store(top_n: int = 10) -> list:
-    docs = []
-    for index, (id, doc) in enumerate(vector_store.store.items()):
-        if index < top_n:
-            docs.append({
-                'id': id,
-                'document_name': doc['metadata']['document_name'],
-                'insert_date': doc['metadata']['insert_date'],
-                'text': doc['text']
-            })
-        else:
-            break
-    return docs
-
-
-def get_vector_store_info():
-    nb_docs = 0
-    max_date, min_date = None, None
-    documents = set()
-    for (id, doc) in vector_store.store.items():
-        nb_docs += 1
-        date = doc['metadata']['insert_date']
-        if max_date is None or max_date < date:
-            max_date = date
-        if min_date is None or min_date > date:
-            min_date = date
-        documents.add(doc['metadata']['document_name'])
-    return {
-        'nb_chunks': nb_docs,
-        'min_insert_date': min_date,
-        'max_insert_date': max_date,
-        'nb_documents': len(documents)
-    }
-
 
 def retrieve(question: str):
     return vector_store.similarity_search(question)
 
-
 def build_qa_messages(question: str, context: str) -> list:
     return [
-        ("system", "You are an assistant for question-answering tasks."),
-        ("system", f"""Use the following pieces of retrieved context to answer the question.\nIf you don't know the answer, just say that you don't know.\nUse three sentences maximum and keep the answer concise.\n{context}"""),
+        ("system", "You are a helpful assistant for question-answering."),
+        ("system", f"""Use the following context to answer briefly (3 sentences max). Say "I don't know" if unsure.\n{context}"""),
         ("user", question)
     ]
 
-
-def answer_question(question: str) -> str:
+def answer_question(question: str, k: int = 5) -> str:
     docs = retrieve(question)
-    docs_content = "\n\n".join(doc.page_content for doc in docs)
-    messages = build_qa_messages(question, docs_content)
-    response = llm.invoke(messages)
-    return response.content
+    context = "\n\n".join(doc.page_content for doc in docs)
+    messages = build_qa_messages(question, context)
+    return llm.invoke(messages).content
