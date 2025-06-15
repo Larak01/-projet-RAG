@@ -6,4 +6,3 @@ pymupdf
 pyyaml
 streamlit
 pandas
-sqlite3  # natif en Python, mais tu peux le noter
