@@ -42,7 +42,6 @@ config = {
 }
 
 
-
 embedder = AzureOpenAIEmbeddings(
     azure_endpoint=config["embedding"]["azure_endpoint"],
     azure_deployment=config["embedding"]["azure_deployment"],
