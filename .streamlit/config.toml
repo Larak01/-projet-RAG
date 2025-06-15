@@ -1,11 +1,11 @@
-[embedding]
-azure_deployment = "gpt-embedding"
-azure_api_key = "sk-..."
-azure_endpoint = "https://toninstance.openai.azure.com/"
+[chat]
+azure_deployment = "gpt-4-chat"
+azure_api_key = "sk-XXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+azure_endpoint = "https://TON_INSTANCE.openai.azure.com/"
 azure_api_version = "2023-12-01-preview"
 
-[chat]
-azure_deployment = "gpt-chat"
-azure_api_key = "sk-..."
-azure_endpoint = "https://toninstance.openai.azure.com/"
+[embedding]
+azure_deployment = "gpt-embedding"
+azure_api_key = "sk-XXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+azure_endpoint = "https://TON_INSTANCE.openai.azure.com/"
 azure_api_version = "2023-12-01-preview"
