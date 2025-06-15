@@ -1,87 +1,60 @@
-import streamlit as st
-import sqlite3
-import pandas as pd
-from backend_langchain import answer_question as answer_lc, store_pdf_file as store_lc
-from llamaindex import answer_question as answer_ll, store_pdf_file as store_ll
+import os
 import tempfile
-from datetime import datetime
+import streamlit as st
+import pandas as pd
 
-# --- UI Setup ---
-st.set_page_config(page_title="Projet RAG", layout="centered")
-st.title("📚 RAG : Retrieval-Augmented Generation")
+from rag.langchain import answer_question, delete_file_from_store, store_pdf_file
 
-# --- Choix du framework ---
-framework = st.radio("Choisissez le moteur RAG", ["LangChain", "LlamaIndex"], horizontal=True)
+st.set_page_config(
+    page_title="Analyse de documents",
+    page_icon="📄",
+)
 
-# --- Choix de la langue ---
-langue = st.selectbox("Choisissez la langue de réponse", ["Français", "Anglais", "Espagnol", "Japonais"])
-lang_codes = {
-    "Français": "French",
-    "Anglais": "English",
-    "Espagnol": "Spanish",
-    "Japonais": "Japanese"
-}
-langue_cible = lang_codes[langue]
+if 'stored_files' not in st.session_state:
+    st.session_state['stored_files'] = []
 
-# --- Choix du top_k ---
-top_k = st.slider("Nombre de documents similaires à récupérer", min_value=1, max_value=10, value=5)
+def main():
+    st.title("🧠 Analyse de documents")
+    st.subheader("Chargez vos documents PDF et interrogez-les avec l'IA.")
 
-# --- Upload de PDF ---
-uploaded_file = st.file_uploader("Téléversez un fichier PDF", type="pdf")
-if uploaded_file is not None:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-        tmp_file.write(uploaded_file.read())
-        tmp_path = tmp_file.name
+    uploaded_files = st.file_uploader(
+        label="📂 Déposez vos fichiers ici",
+        type=['pdf'],
+        accept_multiple_files=True
+    )
 
-    st.info(f"Indexation du fichier : {uploaded_file.name} avec {framework}")
-    if framework == "LangChain":
-        store_lc(tmp_path, uploaded_file.name)
+    file_info = []
+    if uploaded_files:
+        for f in uploaded_files:
+            size_in_kb = len(f.getvalue()) / 1024
+            file_info.append({
+                "Nom du fichier": f.name,
+                "Taille (KB)": f"{size_in_kb:.2f}"
+            })
+
+            if f.name.endswith('.pdf') and f.name not in st.session_state['stored_files']:
+                temp_dir = tempfile.mkdtemp()
+                path = os.path.join(temp_dir, "temp.pdf")
+                with open(path, "wb") as outfile:
+                    outfile.write(f.read())
+                store_pdf_file(path, f.name)
+                st.session_state['stored_files'].append(f.name)
+
+        df = pd.DataFrame(file_info)
+        st.table(df)
+
+    files_to_be_deleted = set(st.session_state['stored_files']) - {f['Nom du fichier'] for f in file_info}
+    for name in files_to_be_deleted:
+        st.session_state['stored_files'].remove(name)
+        delete_file_from_store(name)
+
+    question = st.text_input("❓ Posez votre question")
+
+    if st.button("Analyser") and question:
+        model_response = answer_question(question)
+        st.text_area("Réponse générée", value=model_response, height=200)
     else:
-        store_ll(tmp_path, uploaded_file.name)
-    st.success("Fichier indexé avec succès !")
+        st.text_area("Réponse générée", value="", height=200)
 
-# --- Zone de question ---
-question_utilisateur = st.text_area("Posez votre question", "")
-reponse = None
-
-# --- Traitement ---
-if st.button("Poser la question"):
-    if question_utilisateur.strip() == "":
-        st.warning("Veuillez entrer une question.")
-    else:
-        with st.spinner("Génération de la réponse..."):
-            if framework == "LangChain":
-                reponse = answer_lc(question_utilisateur, language=langue_cible, top_k=top_k)
-            else:
-                reponse = answer_ll(question_utilisateur, language=langue_cible, top_k=top_k)
-        st.success("Réponse générée :")
-        st.markdown(reponse)
-
-        # --- Feedback utilisateur via st.feedback ---
-        feedback = st.feedback("Que pensez-vous de cette réponse ?", key="feedback_widget")
-        if feedback:
-            print("Feedback utilisateur :", feedback)
-
-            try:
-                conn = sqlite3.connect("feedback.db")
-                cursor = conn.cursor()
-                cursor.execute('''CREATE TABLE IF NOT EXISTS feedbacks (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    question TEXT,
-                    reponse TEXT,
-                    note TEXT,
-                    timestamp TEXT
-                )''')
-                conn.commit()
-                cursor.execute("INSERT INTO feedbacks (question, reponse, note, timestamp) VALUES (?, ?, ?, ?)",
-                               (question_utilisateur, reponse, feedback, datetime.now().isoformat()))
-                conn.commit()
-                conn.close()
-                st.success("Feedback enregistré dans la base ✅")
-            except Exception as e:
-                st.error("Erreur lors de l'enregistrement du feedback")
-                st.code(str(e))
-
-# --- Footer ---
-st.markdown("---")
-st.markdown("Projet RAG  — 2025")
+if __name__ == "__main__":
+    main()
