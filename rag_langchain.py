@@ -8,21 +8,18 @@ from langchain_core.documents import Document
 
 from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
 
-# Config depuis st.secrets (plus de fichier config.yaml)
-config = {
-    "embedding": {
-        "azure_endpoint": st.secrets["embedding"]["azure_endpoint"],
-        "azure_deployment": st.secrets["embedding"]["azure_deployment"],
-        "azure_api_version": st.secrets["embedding"]["azure_api_version"],
-        "azure_api_key": st.secrets["embedding"]["azure_api_key"],
-    },
-    "chat": {
-        "azure_endpoint": st.secrets["chat"]["azure_endpoint"],
-        "azure_deployment": st.secrets["chat"]["azure_deployment"],
-        "azure_api_version": st.secrets["chat"]["azure_api_version"],
-        "azure_api_key": st.secrets["chat"]["azure_api_key"],
-    }
-}
+import yaml
+
+def read_config(file_path):
+    with open(file_path, 'r') as file:
+        try:
+            return yaml.safe_load(file)
+        except yaml.YAMLError as e:
+            print(f"Erreur YAML: {e}")
+            return None
+
+config = read_config("secrets/config.yaml")
+
 
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
