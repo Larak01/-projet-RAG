@@ -1,7 +1,7 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-from langchain import answer_question as answer_lc, store_pdf_file as store_lc
+from backend_langchain import answer_question as answer_lc
 from llamaindex import answer_question as answer_ll, store_pdf_file as store_ll
 import tempfile
 from datetime import datetime
