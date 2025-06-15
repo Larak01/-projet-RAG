@@ -37,7 +37,7 @@ Ce projet met en œuvre une architecture **RAG (Retrieval-Augmented Generation)*
 ## 🚀 Lancer l'application localement
 
 ```bash
-git clone https://github.com/Larak01/projet-RAG.git
+git clone "https://github.com/Larak01/projet-RAG.git"
 cd projet-RAG
 pip install -r requirements.txt
 streamlit run app.py
@@ -63,35 +63,14 @@ projet-RAG/
 └── feedback.db                # Base SQLite pour stocker les feedbacks
 ```
 
----
-
-## 🔐 Configuration locale
-
-Créer un fichier `config.toml` (non versionné) contenant vos identifiants Azure OpenAI :
-
-```toml
-[chat]
-azure_deployment = "gpt-chat"
-azure_api_key = "sk-..."
-azure_endpoint = "https://projet-rag-openai.openai.azure.com/"
-azure_api_version = "2023-12-01-preview"
-
-[embedding]
-azure_deployment = "embed-ada"
-azure_api_key = "sk-..."
-azure_endpoint = "https://projet-rag-openai.openai.azure.com/"
-azure_api_version = "2023-12-01-preview"
-```
-
-Ou bien utiliser `st.secrets` si déployé sur Streamlit Cloud.
 
 ---
 
 ## 💡 Déploiement sur Streamlit Cloud
 
-1. Crée un compte sur https://streamlit.io/cloud
-2. Connecte ton dépôt GitHub
-3. Ajoute tes secrets dans `Settings > Secrets` de l'app
+1. Crée un compte: "https://share.streamlit.io/user/larak01"
+2. Connecte mon dépôt GitHub
+3. Ajoute mes secrets dans `Settings > Secrets` de l'app
 
 ---
 
