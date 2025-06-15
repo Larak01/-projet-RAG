@@ -13,6 +13,7 @@ from rag.langchain import store_pdf_file as store_pdf_langchain
 from rag.llamaindex import store_pdf_file as store_pdf_llamaindex
 from rag.langchain import delete_file_from_store as delete_file_langchain
 from rag.llamaindex import delete_file_from_store as delete_file_llamaindex
+from openai import AzureOpenAI
 
 st.set_page_config(
     page_title="Analyse de documents",
@@ -109,3 +110,15 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+client = AzureOpenAI(
+    api_key="TA_CLE_ICI",
+    api_version="2023-12-01-preview",
+    azure_endpoint="https://projet-rag-openai.openai.azure.com/",
+)
+
+response = client.chat.completions.create(
+    model="gpt-35-turbo",
+    messages=[{"role": "user", "content": "Bonjour"}],
+)
+print(response.choices[0].message.content)
