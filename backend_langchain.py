@@ -42,3 +42,41 @@ llm = AzureChatOpenAI(
     openai_api_version=resolve_env(config["chat"]["azure_api_version"]),
     api_key=resolve_env(config["chat"]["azure_api_key"]),
 )
+
+def store_pdf_file(file_path: str, doc_name: str, use_meta_doc: bool=True):
+    loader = PyMuPDFLoader(file_path)
+    docs = loader.load()
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
+    all_splits = text_splitter.split_documents(docs)
+    for split in all_splits:
+        split.metadata = {
+            'document_name': doc_name,
+            'insert_date': datetime.now()
+        }
+    _ = vector_store.add_documents(documents=all_splits)
+    return
+
+def retrieve(question: str, top_k: int = 5):
+    return vector_store.similarity_search(question, k=top_k)
+
+def build_qa_messages(question: str, context: str, language: str) -> list[str]:
+    messages = [
+        ("system", "You are an assistant for question-answering tasks."),
+        ("system", f"""Use the following pieces of retrieved context to answer the question.
+Answer in {language}.
+If you don't know the answer, just say that you don't know.
+Use three sentences maximum and keep the answer concise.
+
+{context}"""),
+        ("user", question)
+    ]
+    return messages
+
+def answer_question(question: str, language: str = "English", top_k: int = 5) -> str:
+    docs = retrieve(question, top_k=top_k)
+    docs_content = "\n\n".join(doc.page_content for doc in docs)
+    messages = build_qa_messages(question, docs_content, language)
+    response = llm.invoke(messages)
+    return response.content
+
+__all__ = ["answer_question", "store_pdf_file"]
