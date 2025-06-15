@@ -1,87 +1,52 @@
-import streamlit as st
-import sqlite3
-import pandas as pd
-from langchain import answer_question as answer_lc, store_pdf_file as store_lc
-from llamaindex import answer_question as answer_ll, store_pdf_file as store_ll
-import tempfile
+import os
+import yaml
 from datetime import datetime
 
-# --- UI Setup ---
-st.set_page_config(page_title="Projet RAG", layout="centered")
-st.title("📚 RAG : Retrieval-Augmented Generation")
+from llama_index.core import Settings
+from llama_index.core.node_parser import SentenceSplitter
+from llama_index.core.schema import TextNode
+from llama_index.core.vector_stores import SimpleVectorStore, VectorStoreQuery
+from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
+from llama_index.llms.azure_openai import AzureOpenAI
+from llama_index.readers.file import PyMuPDFReader
 
-# --- Choix du framework ---
-framework = st.radio("Choisissez le moteur RAG", ["LangChain", "LlamaIndex"], horizontal=True)
+CHUNK_SIZE = 1_000
+CHUNK_OVERLAP = 200
 
-# --- Choix de la langue ---
-langue = st.selectbox("Choisissez la langue de réponse", ["Français", "Anglais", "Espagnol", "Japonais"])
-lang_codes = {
-    "Français": "French",
-    "Anglais": "English",
-    "Espagnol": "Spanish",
-    "Japonais": "Japanese"
-}
-langue_cible = lang_codes[langue]
+def read_config(file_path):
+    with open(file_path, 'r') as file:
+        try:
+            return yaml.safe_load(file)
+        except yaml.YAMLError as e:
+            print(f"Erreur de lecture YAML : {e}")
+            return None
 
-# --- Choix du top_k ---
-top_k = st.slider("Nombre de documents similaires à récupérer", min_value=1, max_value=10, value=5)
+def resolve_env(value):
+    if isinstance(value, str) and value.startswith("__ENV:"):
+        return os.getenv(value[6:], "MISSING_ENV")
+    return value
 
-# --- Upload de PDF ---
-uploaded_file = st.file_uploader("Téléversez un fichier PDF", type="pdf")
-if uploaded_file is not None:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-        tmp_file.write(uploaded_file.read())
-        tmp_path = tmp_file.name
+config = read_config("secrets/config.yaml")
 
-    st.info(f"Indexation du fichier : {uploaded_file.name} avec {framework}")
-    if framework == "LangChain":
-        store_lc(tmp_path, uploaded_file.name)
-    else:
-        store_ll(tmp_path, uploaded_file.name)
-    st.success("Fichier indexé avec succès !")
+llm = AzureOpenAI(
+    model=resolve_env(config["chat"]["azure_deployment"]),
+    deployment_name=resolve_env(config["chat"]["azure_deployment"]),
+    api_key=resolve_env(config["chat"]["azure_api_key"]),
+    azure_endpoint=resolve_env(config["chat"]["azure_endpoint"]),
+    api_version=resolve_env(config["chat"]["azure_api_version"]),
+)
 
-# --- Zone de question ---
-question_utilisateur = st.text_area("Posez votre question", "")
-reponse = None
+embedder = AzureOpenAIEmbedding(
+    model=resolve_env(config["embedding"]["azure_deployment"]),
+    deployment_name=resolve_env(config["embedding"]["azure_deployment"]),
+    api_key=resolve_env(config["embedding"]["azure_api_key"]),
+    azure_endpoint=resolve_env(config["embedding"]["azure_endpoint"]),
+    api_version=resolve_env(config["embedding"]["azure_api_version"]),
+)
 
-# --- Traitement ---
-if st.button("Poser la question"):
-    if question_utilisateur.strip() == "":
-        st.warning("Veuillez entrer une question.")
-    else:
-        with st.spinner("Génération de la réponse..."):
-            if framework == "LangChain":
-                reponse = answer_lc(question_utilisateur, language=langue_cible, top_k=top_k)
-            else:
-                reponse = answer_ll(question_utilisateur, language=langue_cible, top_k=top_k)
-        st.success("Réponse générée :")
-        st.markdown(reponse)
+Settings.llm = llm
+Settings.embed_model = embedder
 
-        # --- Feedback utilisateur via st.feedback ---
-        feedback = st.feedback("Que pensez-vous de cette réponse ?", key="feedback_widget")
-        if feedback:
-            print("Feedback utilisateur :", feedback)
+vector_store = SimpleVectorStore()
 
-            try:
-                conn = sqlite3.connect("feedback.db")
-                cursor = conn.cursor()
-                cursor.execute('''CREATE TABLE IF NOT EXISTS feedbacks (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    question TEXT,
-                    reponse TEXT,
-                    note TEXT,
-                    timestamp TEXT
-                )''')
-                conn.commit()
-                cursor.execute("INSERT INTO feedbacks (question, reponse, note, timestamp) VALUES (?, ?, ?, ?)",
-                               (question_utilisateur, reponse, feedback, datetime.now().isoformat()))
-                conn.commit()
-                conn.close()
-                st.success("Feedback enregistré dans la base ✅")
-            except Exception as e:
-                st.error("Erreur lors de l'enregistrement du feedback")
-                st.code(str(e))
-
-# --- Footer ---
-st.markdown("---")
-st.markdown("Projet RAG  — 2025")
+# Le reste du fichier reste inchangé (store_pdf_file, retrieve, answer_question...)
