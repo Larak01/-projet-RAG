@@ -1,7 +1,6 @@
 import streamlit as st
 from datetime import datetime
 
-from llama_index.core import VectorStoreIndex
 from llama_index.core import Settings
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import TextNode
@@ -14,23 +13,20 @@ from llama_index.readers.file import PyMuPDFReader
 CHUNK_SIZE = 1_000
 CHUNK_OVERLAP = 200
 
-# Lecture des paramètres depuis st.secrets
-config = st.secrets
-
 llm = AzureOpenAI(
-    model=config["chat"]["azure_deployment"],
-    deployment_name=config["chat"]["azure_deployment"],
-    api_key=config["chat"]["azure_api_key"],
-    azure_endpoint=config["chat"]["azure_endpoint"],
-    api_version=config["chat"]["azure_api_version"]
+    model=st.secrets["chat_azure_deployment"],
+    deployment_name=st.secrets["chat_azure_deployment"],
+    api_key=st.secrets["chat_azure_api_key"],
+    azure_endpoint=st.secrets["chat_azure_endpoint"],
+    api_version=st.secrets["chat_azure_api_version"]
 )
 
 embedder = AzureOpenAIEmbedding(
-    model="text-embedding-ada-002",  
-    deployment_name=config["embedding"]["azure_deployment"],
-    azure_endpoint=config["embedding"]["azure_endpoint"],
-    api_key=config["embedding"]["azure_api_key"],
-    api_version=config["embedding"]["azure_api_version"]
+    model="text-embedding-ada-002",
+    deployment_name=st.secrets["embedding_azure_deployment"],
+    azure_endpoint=st.secrets["embedding_azure_endpoint"],
+    api_key=st.secrets["embedding_azure_api_key"],
+    api_version=st.secrets["embedding_azure_api_version"]
 )
 
 Settings.llm = llm
@@ -52,17 +48,13 @@ def store_pdf_file(file_path: str, doc_name: str):
 
     nodes = []
     for idx, text_chunk in enumerate(text_chunks):
-        node = TextNode(
-            text=text_chunk,
-        )
+        node = TextNode(text=text_chunk)
         src_doc = documents[doc_idxs[idx]]
         node.metadata = src_doc.metadata
         nodes.append(node)
 
-    for node in nodes:  
-        node_embedding = embedder.get_text_embedding(
-            node.get_content(metadata_mode="all")
-        )
+    for node in nodes:
+        node_embedding = embedder.get_text_embedding(node.get_content(metadata_mode="all"))
         node.embedding = node_embedding
 
     vector_store.add(nodes)
