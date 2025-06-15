@@ -28,12 +28,13 @@ llm = AzureOpenAI(
 )
 
 embedder = AzureOpenAIEmbedding(
-    model=config["embedding"]["azure_deployment"],
-    deployment_name=config["embedding"]["azure_deployment"],
+    model="text-embedding-ada-002",  
+    deployment_name=config["embedding"]["azure_deployment"],  # ex: "embed-ada"
     azure_endpoint=config["embedding"]["azure_endpoint"],
     api_key=config["embedding"]["azure_api_key"],
     api_version=config["embedding"]["azure_api_version"]
 )
+
 
 
 
