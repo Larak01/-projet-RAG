@@ -20,6 +20,9 @@ lang_codes = {
 }
 langue_cible = lang_codes[langue]
 
+# --- Choix du top_k ---
+top_k = st.slider("Nombre de documents similaires à récupérer", min_value=1, max_value=10, value=5)
+
 # --- Upload de PDF ---
 uploaded_file = st.file_uploader("Téléversez un fichier PDF", type="pdf")
 if uploaded_file is not None:
@@ -44,9 +47,9 @@ if st.button("Poser la question"):
     else:
         with st.spinner("Génération de la réponse..."):
             if framework == "LangChain":
-                reponse = answer_lc(question_utilisateur, language=langue_cible)
+                reponse = answer_lc(question_utilisateur, language=langue_cible, top_k=top_k)
             else:
-                reponse = answer_ll(question_utilisateur, language=langue_cible)
+                reponse = answer_ll(question_utilisateur, language=langue_cible, top_k=top_k)
         st.success("Réponse générée :")
         st.markdown(reponse)
 
