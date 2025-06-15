@@ -4,12 +4,18 @@ Ce projet met en œuvre une architecture **RAG (Retrieval-Augmented Generation)*
 
 ---
 
-## 🎯 Objectifs pédagogiques
+## 🎯 Ce que j'ai réalisé dans ce projet
 
-- ⚙️ Implémenter une architecture RAG fonctionnelle (embeddings + moteur vectoriel + LLM)
-- 💡 Comparer deux frameworks : **LangChain** et **LlamaIndex**
-- 🖥️ Créer une interface utilisateur interactive avec **Streamlit**
-- 🌐 Intégrer la **multilingue**, **personnalisation dynamique** et **feedback utilisateur**
+- 🔧 J'ai intégré **deux frameworks** RAG au choix : **LangChain** et **LlamaIndex**
+- 📁 J'ai ajouté une interface d'upload de fichiers PDF avec vectorisation automatique
+- 🔤 J'ai ajouté un **sélecteur de langue de réponse** multilingue : Français, Anglais, Espagnol, Japonais
+- 🔎 J'ai intégré un **slider** permettant de choisir dynamiquement combien de documents (`k`) sont récupérés par la recherche vectorielle
+- 🧪 J'ai implémenté un système de **feedback utilisateur** via `st.radio` puis sauvegardé les réponses dans une base **SQLite**
+- 🧠 J'ai utilisé **Azure OpenAI** comme fournisseur de LLM et d'embeddings
+- ☁️ J'ai configuré deux **déploiements personnalisés** sur Azure :
+  - `gpt-35-turbo` (déployé sous le nom `gpt-chat`) pour les réponses du chatbot
+  - `text-embedding-ada-002` (déployé sous le nom `embed-ada`) pour la vectorisation des documents
+- 🔐 J’ai appris à sécuriser mes clés API via `st.secrets` sur Streamlit Cloud
 
 ---
 
@@ -22,6 +28,9 @@ Ce projet met en œuvre une architecture **RAG (Retrieval-Augmented Generation)*
 - 🛠️ Paramétrage dynamique du nombre de documents récupérés (`top_k`)
 - 📝 Feedback utilisateur avec `st.radio` et enregistrement en base SQLite
 - 🔐 Connexion sécurisée à **Azure OpenAI** pour le LLM et les embeddings
+- 📦 Utilisation de deux modèles Azure déployés manuellement :
+  - `gpt-35-turbo` pour le chat (`gpt-chat`)
+  - `text-embedding-ada-002` pour les embeddings (`embed-ada`)
 
 ---
 
@@ -34,7 +43,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-> 🧠 Ce projet utilise **Azure OpenAI** pour accéder aux modèles `gpt-35-turbo` et `text-embedding-ada-002`. Les paramètres API sont stockés localement dans un fichier `config.toml` (non inclus dans le dépôt).
+> 🧠 Ce projet utilise **Azure OpenAI** pour accéder aux modèles `gpt-35-turbo` et `text-embedding-ada-002`. Les paramètres API sont stockés localement dans un fichier `config.toml` (non inclus dans le dépôt) ou gérés dans `st.secrets` si déployé sur Streamlit Cloud.
 
 ---
 
@@ -64,16 +73,17 @@ Créer un fichier `config.toml` (non versionné) contenant vos identifiants Azur
 [chat]
 azure_deployment = "gpt-chat"
 azure_api_key = "sk-..."
-azure_endpoint = "https://projet-rag-openai.azure.com/"
+azure_endpoint = "https://projet-rag-openai.openai.azure.com/"
 azure_api_version = "2023-12-01-preview"
 
 [embedding]
 azure_deployment = "embed-ada"
 azure_api_key = "sk-..."
-azure_endpoint ="https://projet-rag-openai.azure.com/"
+azure_endpoint = "https://projet-rag-openai.openai.azure.com/"
 azure_api_version = "2023-12-01-preview"
 ```
 
+Ou bien utiliser `st.secrets` si déployé sur Streamlit Cloud.
 
 ---
 
