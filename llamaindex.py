@@ -42,6 +42,7 @@ if uploaded_file is not None:
 
 # --- Zone de question ---
 question_utilisateur = st.text_area("Posez votre question", "")
+reponse = None
 
 # --- Traitement ---
 if st.button("Poser la question"):
@@ -56,25 +57,27 @@ if st.button("Poser la question"):
         st.success("Réponse générée :")
         st.markdown(reponse)
 
-        # --- Feedback utilisateur ---
-        feedback = st.radio("Êtes-vous satisfait de la réponse ?", ["👍 Oui", "👎 Non"])
-        if st.button("Enregistrer le feedback"):
+        # --- Feedback utilisateur via st.feedback ---
+        feedback = st.feedback("Que pensez-vous de cette réponse ?", key="feedback_widget")
+        if feedback:
+            print("Feedback utilisateur :", feedback)
+
             try:
                 conn = sqlite3.connect("feedback.db")
                 cursor = conn.cursor()
                 cursor.execute('''CREATE TABLE IF NOT EXISTS feedbacks (
-                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                    question TEXT,
-                                    reponse TEXT,
-                                    satisfaction TEXT,
-                                    timestamp TEXT
-                                )''')
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    question TEXT,
+                    reponse TEXT,
+                    note TEXT,
+                    timestamp TEXT
+                )''')
                 conn.commit()
-                cursor.execute("INSERT INTO feedbacks (question, reponse, satisfaction, timestamp) VALUES (?, ?, ?, ?)",
+                cursor.execute("INSERT INTO feedbacks (question, reponse, note, timestamp) VALUES (?, ?, ?, ?)",
                                (question_utilisateur, reponse, feedback, datetime.now().isoformat()))
                 conn.commit()
                 conn.close()
-                st.success("Feedback enregistré avec succès ✅")
+                st.success("Feedback enregistré dans la base ✅")
             except Exception as e:
                 st.error("Erreur lors de l'enregistrement du feedback")
                 st.code(str(e))
