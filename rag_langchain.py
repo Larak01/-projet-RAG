@@ -1,32 +1,29 @@
-import yaml
 from datetime import datetime
-
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
-
 from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
+
+# ✅ Configuration Azure directement dans le code (remplace les valeurs ci-dessous)
+embedder = AzureOpenAIEmbeddings(
+    azure_endpoint="https://mon-instance.openai.azure.com",
+    azure_deployment="text-embedding-ada-002",
+    openai_api_version="2024-02-15",
+    api_key="sk-abc1234567890abcdef1234567890xyz"
+)
+
+llm = AzureChatOpenAI(
+    azure_endpoint="https://mon-instance.openai.azure.com",
+    azure_deployment="gpt-35-turbo",
+    openai_api_version="2024-02-15",
+    api_key="sk-def9876543210fedcba9876543210uvw"
+)
 
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 
-
-def read_config(file_path):
-    with open(file_path, 'r') as file:
-        try:
-            return yaml.safe_load(file)
-        except yaml.YAMLError as e:
-            print(f"Erreur YAML: {e}")
-            return None
-
-# ✅ Charger depuis config.yaml
-config = read_config("secrets/config.yaml")
-
-embedder = AzureOpenAIEmbeddings(**config["embedding"])
-llm = AzureChatOpenAI(**config["chat"])
-
-# ✅ Initialiser la base FAISS vide
+# ✅ Base vectorielle vide
 vector_store = FAISS.from_documents([], embedder)
 
 
@@ -70,10 +67,7 @@ def retrieve(question: str):
 def build_qa_messages(question: str, context: str) -> list:
     return [
         ("system", "You are an assistant for question-answering tasks."),
-        ("system", f"""Use the following pieces of retrieved context to answer the question.
-If you don't know the answer, just say that you don't know.
-Use three sentences maximum and keep the answer concise.
-{context}"""),
+        ("system", f"""Use the following pieces of retrieved context to answer the question.\nIf you don't know the answer, just say that you don't know.\nUse three sentences maximum and keep the answer concise.\n{context}"""),
         ("user", question)
     ]
 
