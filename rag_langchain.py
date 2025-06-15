@@ -1,104 +1,67 @@
-import yaml
 from datetime import datetime
-
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
+import os
 
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 
+# ❗ Remplir ici directement les valeurs, remplace les chaînes par les vraies valeurs
+EMBEDDING_CONFIG = {
+    "model": "text-embedding-ada-002",
+    "deployment_name": "text-embedding-ada-002",
+    "api_key": "sk-...",
+    "azure_endpoint": "https://mon-instance.openai.azure.com",
+    "api_version": "2024-02-15",
+}
+CHAT_CONFIG = {
+    "model": "gpt-35-turbo",
+    "deployment_name": "gpt-35-turbo",
+    "api_key": "sk-...",
+    "azure_endpoint": "https://mon-instance.openai.azure.com",
+    "api_version": "2024-02-15",
+}
 
-def read_config(file_path):
-    with open(file_path, 'r') as file:
-        try:
-            return yaml.safe_load(file)
-        except yaml.YAMLError as e:
-            print(f"Erreur YAML: {e}")
-            return None
+embedder = AzureOpenAIEmbeddings(**EMBEDDING_CONFIG)
+llm = AzureChatOpenAI(**CHAT_CONFIG)
 
-# ✅ Charger config locale
-config = read_config("config.yaml")
+# Init vecteur vide
+vector_store = FAISS.from_documents([Document(page_content="init")], embedder)
+vector_store.delete(vector_store.index_to_docstore_id.keys())
 
-# ✅ Embeddings
-embedder = AzureOpenAIEmbeddings(
-    azure_endpoint=config["embedding"]["azure_endpoint"],
-    azure_deployment=config["embedding"]["azure_deployment"],
-    api_key=config["embedding"]["azure_api_key"],
-    api_version=config["embedding"]["azure_api_version"]
-)
-
-# ✅ LLM
-llm = AzureChatOpenAI(
-    azure_endpoint=config["chat"]["azure_endpoint"],
-    azure_deployment=config["chat"]["azure_deployment"],
-    api_key=config["chat"]["azure_api_key"],
-    api_version=config["chat"]["azure_api_version"]
-)
-
-# ✅ Index vide initial
-vector_store = FAISS.from_documents([], embedder)
-
-
-def get_meta_doc(extract: str) -> str:
-    messages = [
-        ("system", "You are a librarian extracting metadata from documents."),
-        ("user", f"""Extract the following metadata. Answer 'unknown' if missing.
-- title
-- author
-- source
-- type (e.g. scientific, news, literature)
-- language
-- themes (keywords)
-
-<content>
-{extract}
-</content>""")
-    ]
-    response = llm.invoke(messages)
-    return response.content
-
-
-def store_pdf_file(file_path: str, doc_name: str, use_meta_doc: bool = True):
+def store_pdf_file(file_path: str, doc_name: str):
     loader = PyMuPDFLoader(file_path)
     docs = loader.load()
     splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
     chunks = splitter.split_documents(docs)
-
-    now = datetime.now()
-    for c in chunks:
-        c.metadata = {"document_name": doc_name, "insert_date": now}
-
-    if use_meta_doc:
-        extract = "\n\n".join(c.page_content for c in chunks[:min(10, len(chunks))])
-        meta = Document(
-            page_content=get_meta_doc(extract),
-            metadata={"document_name": doc_name, "insert_date": now}
-        )
-        chunks.append(meta)
-
+    for chunk in chunks:
+        chunk.metadata.update({
+            "document_name": doc_name,
+            "insert_date": datetime.now().isoformat()
+        })
     vector_store.add_documents(chunks)
 
+def retrieve(question: str, k: int = 5):
+    return vector_store.similarity_search(question, k=k)
 
-def retrieve(question: str):
-    return vector_store.similarity_search(question)
-
-
-def build_qa_messages(question: str, context: str) -> list:
+def build_qa_messages(question: str, context: str, langue: str) -> list:
+    instructions = {
+        "Français": "Réponds en français.",
+        "Anglais": "Answer in English.",
+        "Espagnol": "Responde en español.",
+        "Japonais": "日本語で答えてください。"
+    }
     return [
-        ("system", "You are an assistant for question-answering tasks."),
-        ("system", f"""Use the following context to answer in 3 sentences max. Say 'I don't know' if unsure.
-
-{context}"""),
+        ("system", "You are a helpful assistant."),
+        ("system", instructions.get(langue, "Answer in English.") + "\nUse max 3 sentences.\n" + context),
         ("user", question)
     ]
 
-
-def answer_question(question: str) -> str:
-    docs = retrieve(question)
-    context = "\n\n".join(d.page_content for d in docs)
-    messages = build_qa_messages(question, context)
-    response = llm.invoke(messages)
-    return response.content
+def answer_question(question: str, langue: str = "Français", k: int = 5) -> str:
+    docs = retrieve(question, k=k)
+    context = "\n\n".join(doc.page_content for doc in docs)
+    messages = build_qa_messages(question, context, langue)
+    return llm.invoke(messages).content
