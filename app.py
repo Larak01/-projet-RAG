@@ -32,6 +32,9 @@ embedder = AzureOpenAIEmbedding(
 Settings.llm = llm
 Settings.embed_model = embedder
 
+st.write("🟢 Clé détectée:", st.secrets["chat_azure_deployment"])
+
+
 vector_store = SimpleVectorStore()
 
 def store_pdf_file(file_path: str, doc_name: str):
