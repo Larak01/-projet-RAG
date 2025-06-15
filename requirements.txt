@@ -1,6 +1,7 @@
 langchain
 langchain-community
 langchain-openai
+langchain-text-splitters
 llama-index
 pymupdf
 pyyaml
