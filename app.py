@@ -1,49 +1,52 @@
 import streamlit as st
 from datetime import datetime
 import sqlite3
-from rag_langchain import store_pdf_file, answer_question
+from rag_langchain import store_pdf_file as lc_store, answer_question as lc_answer
+from llamaindex import store_pdf_file as li_store, answer_question as li_answer
 
-os.makedirs("uploaded_docs", exist_ok=True)
-st.set_page_config(page_title="Assistant RAG", layout="centered")
-st.title("📚 Assistant Documentaire - Projet RAG")
+st.title("📚 Assistant RAG – Projet MAG3")
 
-# Paramètres
-with st.sidebar:
-    st.header("Paramètres")
-    langue = st.selectbox("Langue :", ["Français", "Anglais", "Espagnol", "Japonais"])
-    top_k = st.slider("Top K documents :", 1, 10, 5)
+framework = st.radio("Choix du moteur :", ["LangChain", "LlamaIndex"])
+langue = st.selectbox("Langue de réponse :", ["Français", "Anglais", "Espagnol", "Japonais"])
+top_k = st.slider("Top-K documents :", 1, 10, 5)
 
-# PDF Upload
-uploaded = st.file_uploader("📄 Déposez un fichier PDF", type="pdf")
-if uploaded:
-    path = f"uploaded_docs/{uploaded.name}"
+conn = sqlite3.connect("feedback.db")
+c = conn.cursor()
+c.execute("CREATE TABLE IF NOT EXISTS feedbacks (timestamp TEXT, question TEXT, response TEXT, feedback TEXT)")
+
+langue_map = {
+    "Français": "Réponds en français.",
+    "Anglais": "Answer in English.",
+    "Espagnol": "Responde en español.",
+    "Japonais": "日本語で答えてください。"
+}
+
+st.markdown("### 📄 Charger un PDF")
+uploaded_file = st.file_uploader("Uploader un fichier PDF", type=["pdf"])
+if uploaded_file:
+    path = f"uploaded_docs/{uploaded_file.name}"
     with open(path, "wb") as f:
-        f.write(uploaded.read())
-    st.success("Fichier chargé.")
-    try:
-        store_pdf_file(path, uploaded.name)
-        st.success("Indexation terminée.")
-    except Exception as e:
-        st.error(f"Erreur indexation : {e}")
+        f.write(uploaded_file.read())
+    st.success("✅ Fichier chargé.")
+    if framework == "LangChain":
+        lc_store(path, uploaded_file.name)
+    else:
+        li_store(path, uploaded_file.name)
+    st.success("✅ Indexation terminée.")
 
-# Question
-question = st.text_input("❓ Posez une question sur le document :")
+question = st.text_input("❓ Votre question :")
 if question:
+    full_q = langue_map[langue] + "\n" + question
     with st.spinner("Recherche..."):
-        reponse = answer_question(question, langue, top_k)
+        response = lc_answer(full_q, k=top_k) if framework == "LangChain" else li_answer(full_q, k=top_k)
         st.markdown("### Réponse :")
-        st.write(reponse)
+        st.write(response)
 
-        # Feedback
-        feedback = st.radio("Utile ?", ["Oui", "Non"], horizontal=True)
-        if feedback:
-            conn = sqlite3.connect("feedback.db")
-            c = conn.cursor()
-            c.execute("CREATE TABLE IF NOT EXISTS feedbacks (timestamp TEXT, question TEXT, response TEXT, feedback TEXT)")
-            c.execute("INSERT INTO feedbacks VALUES (?, ?, ?, ?)",
-                      (datetime.now().isoformat(), question, reponse, feedback))
-            conn.commit()
-            conn.close()
-            st.success("Merci pour votre retour !")
+    feedback = st.radio("Utile ?", ["Oui", "Non"], horizontal=True)
+    if feedback:
+        c.execute("INSERT INTO feedbacks VALUES (?, ?, ?, ?)",
+                  (datetime.now().isoformat(), question, response, feedback))
+        conn.commit()
+        st.success("Merci pour votre retour !")
 
-st.caption("Projet RAG - MAG3 2025")
+conn.close()
