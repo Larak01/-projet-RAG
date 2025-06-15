@@ -11,8 +11,8 @@ headless = true
 [client]
 showSidebarNavigation = true
 
-[layout]
-wide = false
+[browser]
+gatherUsageStats = false
 
 [general]
 pageTitle = "Assistant Documentaire RAG"
