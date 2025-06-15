@@ -1,5 +1,6 @@
 import yaml
 import streamlit as st
+import toml
 from datetime import datetime
 
 from llama_index.core import VectorStoreIndex
@@ -26,20 +27,16 @@ def read_config(file_path):
             print(f"Error reading YAML file: {e}")
             return None
 
-config = {
-    "chat": {
-        "azure_deployment": st.secrets["chat"]["azure_deployment"],
-        "azure_api_key": st.secrets["chat"]["azure_api_key"],
-        "azure_endpoint": st.secrets["chat"]["azure_endpoint"],
-        "azure_api_version": st.secrets["chat"]["azure_api_version"],
-    },
-    "embedding": {
-        "azure_deployment": st.secrets["embedding"]["azure_deployment"],
-        "azure_api_key": st.secrets["embedding"]["azure_api_key"],
-        "azure_endpoint": st.secrets["embedding"]["azure_endpoint"],
-        "azure_api_version": st.secrets["embedding"]["azure_api_version"],
-    }
-}
+
+
+config = toml.load("config.toml")
+
+embedder = AzureOpenAIEmbeddings(
+    azure_endpoint=config["embedding"]["azure_endpoint"],
+    azure_deployment=config["embedding"]["azure_deployment"],
+    openai_api_version=config["embedding"]["azure_api_version"],
+    api_key=config["embedding"]["azure_api_key"]
+)
 
 
 
