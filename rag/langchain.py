@@ -1,146 +1,92 @@
-import toml
-import streamlit as st
-from datetime import datetime
+# 📚 Projet RAG — Retrieval-Augmented Generation
 
-from langchain_community.document_loaders import TextLoader
-from langchain_community.document_loaders import PyMuPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_core.vectorstores import InMemoryVectorStore
-from langchain_core.documents import Document
+Ce projet met en œuvre une architecture **RAG (Retrieval-Augmented Generation)** pour améliorer la qualité des réponses générées par des modèles de langage (LLM). L’approche repose sur l’extraction automatique de contenu documentaire pertinent pour réduire les hallucinations.
 
-from langchain_openai import AzureOpenAIEmbeddings
-from langchain_openai import AzureChatOpenAI
+---
 
-CHUNK_SIZE = 1_000
-CHUNK_OVERLAP = 200
+## 🎯 Objectifs pédagogiques
 
-# Lecture depuis config.toml
-config = toml.load("config.toml")
+- ⚙️ Implémenter une architecture RAG fonctionnelle (embeddings + moteur vectoriel + LLM)
+- 💡 Comparer deux frameworks : **LangChain** et **LlamaIndex**
+- 🖥️ Créer une interface utilisateur interactive avec **Streamlit**
+- 🌐 Intégrer la **multilingue**, **personnalisation dynamique** et **feedback utilisateur**
 
-embedder = AzureOpenAIEmbeddings(
-    azure_endpoint=config["chat"]["azure_endpoint"],
-    azure_deployment=config["chat"]["azure_deployment"],
-    openai_api_version=config["chat"]["azure_api_version"],
-    api_key=config["chat"]["azure_api_key"]
-)
+---
 
-vector_store = InMemoryVectorStore(embedder)
+## ✅ Fonctionnalités principales
 
-llm = AzureChatOpenAI(
-    azure_endpoint=config["chat"]["azure_endpoint"],
-    azure_deployment=config["chat"]["azure_deployment"],
-    openai_api_version=config["chat"]["azure_api_version"],
-    api_key=config["chat"]["azure_api_key"]
-)
+- 📄 Upload de fichiers PDF avec vectorisation automatique
+- ❓ Système de question-réponse avec injection de contexte
+- 🧠 Choix du framework : `LangChain` ou `LlamaIndex`
+- 🌍 Sélecteur de langue : Français, Anglais, Espagnol, Japonais
+- 🛠️ Paramétrage dynamique du nombre de documents récupérés (`top_k`)
+- 📝 Feedback utilisateur avec `st.radio` et enregistrement en base SQLite
+- 🔐 Connexion sécurisée à **Azure OpenAI** pour le LLM et les embeddings
 
-def get_meta_doc(extract: str) -> str:
-    messages = [
-        ("system", "You are a librarian extracting metadata from documents."),
-        ("user", f"""Extract from the content the following metadata.
-        Answer 'unknown' if you cannot find or generate the information.
-        Metadata list:
-        - title
-        - author
-        - source
-        - type of content (e.g. scientific paper, litterature, news, etc.)
-        - language
-        - themes as a list of keywords
+---
 
-        <content>
-        {extract}
-        </content>
-        """)
-    ]
-    response = llm.invoke(messages)
-    return response.content
+## 🚀 Lancer l'application localement
 
-def store_pdf_file(file_path: str, doc_name: str, use_meta_doc: bool=True):
-    loader = PyMuPDFLoader(file_path)
-    docs = loader.load()
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
-    all_splits = text_splitter.split_documents(docs)
-    for split in all_splits:
-        split.metadata = {
-            'document_name': doc_name,
-            'insert_date': datetime.now()
-        }
-    if use_meta_doc:
-        extract = '\n\n'.join([split.page_content for split in all_splits[:min(10, len(all_splits))]])
-        meta_doc = Document(
-            page_content=get_meta_doc(extract),
-            metadata={
-                'document_name': doc_name,
-                'insert_date': datetime.now()
-            })
-        all_splits.append(meta_doc)
-    _ = vector_store.add_documents(documents=all_splits)
-    return
+```bash
+git clone https://github.com/Larak01/projet-RAG.git
+cd projet-RAG
+pip install -r requirements.txt
+streamlit run app.py
+```
 
-def delete_file_from_store(name: str) -> int:
-    ids_to_remove = []
-    for (id, doc) in vector_store.store.items():
-        if name == doc['metadata']['document_name']:
-            ids_to_remove.append(id)
-    vector_store.delete(ids_to_remove)
-    return len(ids_to_remove)
+> 🧠 Ce projet utilise **Azure OpenAI** pour accéder aux modèles `gpt-35-turbo` et `text-embedding-ada-002`. Les paramètres API sont stockés localement dans un fichier `config.toml` (non inclus dans le dépôt).
 
-def inspect_vector_store(top_n: int=10) -> list:
-    docs = []
-    for index, (id, doc) in enumerate(vector_store.store.items()):
-        if index < top_n:
-            docs.append({
-                'id': id,
-                'document_name': doc['metadata']['document_name'],
-                'insert_date': doc['metadata']['insert_date'],
-                'text': doc['text']
-            })
-        else:
-            break
-    return docs
+---
 
-def get_vector_store_info():
-    nb_docs = 0
-    max_date, min_date = None, None
-    documents = set()
-    for (id, doc) in vector_store.store.items():
-        nb_docs += 1
-        if max_date is None or max_date < doc['metadata']['insert_date']:
-            max_date = doc['metadata']['insert_date']
-        if min_date is None or min_date > doc['metadata']['insert_date']:
-            min_date = doc['metadata']['insert_date']
-        documents.add(doc['metadata']['document_name'])
-    return {
-        'nb_chunks': nb_docs,
-        'min_insert_date': min_date,
-        'max_insert_date': max_date,
-        'nb_documents': len(documents)
-    }
+## 🗄️ Structure du projet
 
-def retrieve(question: str):
-    retrieved_docs = vector_store.similarity_search(question)
-    return retrieved_docs
+```
+projet-RAG/
+│
+├── app.py                      # Application principale Streamlit
+├── requirements.txt           # Dépendances Python
+├── README.md                  # Ce fichier
+├── samples/                   # Fichiers PDF de démonstration
+├── rag/
+│   ├── langchain.py           # Pipeline utilisant LangChain
+│   └── llamaindex.py          # Pipeline utilisant LlamaIndex
+├── pages/feedback.py          # Page dédiée à l'analyse des retours utilisateur
+└── feedback.db                # Base SQLite pour stocker les feedbacks
+```
 
-def build_qa_messages(question: str, context: str) -> list[str]:
-    messages = [
-        ("system", "You are an assistant for question-answering tasks."),
-        ("system", f"""Use the following pieces of retrieved context to answer the question.
-        If you don't know the answer, just say that you don't know.
-        Use three sentences maximum and keep the answer concise.
-        {context}"""),
-        ("user", question)
-    ]
-    return messages
+---
 
-def answer_question(question: str) -> str:
-    inspect_vector_store()
-    docs = retrieve(question)
-    docs_content = "\n\n".join(doc.page_content for doc in docs)
-    print("Question:", question)
-    print("------")
-    for doc in docs:
-        print("Chunk:", doc.id)
-        print(doc.page_content)
-        print("------")
-    messages = build_qa_messages(question, docs_content)
-    response = llm.invoke(messages)
-    return response.content
+## 🔐 Configuration locale
+
+Créer un fichier `config.toml` (non versionné) contenant vos identifiants Azure OpenAI :
+
+```toml
+[chat]
+azure_deployment = "gpt-chat"
+azure_api_key = "sk-..."
+azure_endpoint = "https://projet-rag-openai.azure.com/"
+azure_api_version = "2023-12-01-preview"
+
+[embedding]
+azure_deployment = "embed-ada"
+azure_api_key = "sk-..."
+azure_endpoint ="https://projet-rag-openai.azure.com/"
+azure_api_version = "2023-12-01-preview"
+```
+
+
+---
+
+## 💡 Déploiement sur Streamlit Cloud
+
+1. Crée un compte sur https://streamlit.io/cloud
+2. Connecte ton dépôt GitHub
+3. Ajoute tes secrets dans `Settings > Secrets` de l'app
+
+---
+
+## 📬 Contact
+
+Pour toute question, contactez [Larak01](https://github.com/Larak01).
+
+Bon RAG avec Azure OpenAI ! 🎉
