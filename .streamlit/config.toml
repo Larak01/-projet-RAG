@@ -1,3 +1,11 @@
-[browser]
+[embedding]
+azure_deployment = "gpt-embedding"
+azure_api_key = "sk-..."
+azure_endpoint = "https://toninstance.openai.azure.com/"
+azure_api_version = "2023-12-01-preview"
 
-gatherUsageStats = false
+[chat]
+azure_deployment = "gpt-chat"
+azure_api_key = "sk-..."
+azure_endpoint = "https://toninstance.openai.azure.com/"
+azure_api_version = "2023-12-01-preview"
