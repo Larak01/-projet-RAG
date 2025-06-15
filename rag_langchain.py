@@ -1,67 +1,79 @@
+import os
 from datetime import datetime
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
-from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
-import os
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 
+# Paramètres
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 
-# ❗ Remplir ici directement les valeurs, remplace les chaînes par les vraies valeurs
-EMBEDDING_CONFIG = {
-    "model": "text-embedding-ada-002",
-    "deployment_name": "text-embedding-ada-002",
-    "api_key": "sk-...",
-    "azure_endpoint": "https://mon-instance.openai.azure.com",
-    "api_version": "2024-02-15",
-}
-CHAT_CONFIG = {
-    "model": "gpt-35-turbo",
-    "deployment_name": "gpt-35-turbo",
-    "api_key": "sk-...",
-    "azure_endpoint": "https://mon-instance.openai.azure.com",
-    "api_version": "2024-02-15",
-}
+# 🔐 Lecture sécurisée de la clé API
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-embedder = AzureOpenAIEmbeddings(**EMBEDDING_CONFIG)
-llm = AzureChatOpenAI(**CHAT_CONFIG)
+# Initialisation des composants
+embedder = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY)
+vector_store = FAISS.from_documents([], embedder)
 
-# Init vecteur vide
-vector_store = FAISS.from_documents([Document(page_content="init")], embedder)
-vector_store.delete(vector_store.index_to_docstore_id.keys())
+# Génère un document de métadonnées à partir d’un extrait
+def get_meta_doc(extract: str) -> str:
+    messages = [
+        ("system", "You are a librarian extracting metadata from documents."),
+        ("user", f"""Extract metadata:
+- title
+- author
+- source
+- type (e.g. scientific paper, news, literature, etc.)
+- language
+- themes (list of keywords)
 
-def store_pdf_file(file_path: str, doc_name: str):
+<content>
+{extract}
+</content>""")
+    ]
+    response = llm.invoke(messages)
+    return response.content
+
+# Indexe un fichier PDF
+def store_pdf_file(file_path: str, doc_name: str, use_meta_doc: bool = True):
     loader = PyMuPDFLoader(file_path)
     docs = loader.load()
+
     splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
-    chunks = splitter.split_documents(docs)
-    for chunk in chunks:
-        chunk.metadata.update({
-            "document_name": doc_name,
-            "insert_date": datetime.now().isoformat()
-        })
-    vector_store.add_documents(chunks)
+    all_splits = splitter.split_documents(docs)
 
-def retrieve(question: str, k: int = 5):
-    return vector_store.similarity_search(question, k=k)
+    for split in all_splits:
+        split.metadata = {"document_name": doc_name, "insert_date": datetime.now()}
 
-def build_qa_messages(question: str, context: str, langue: str) -> list:
-    instructions = {
-        "Français": "Réponds en français.",
-        "Anglais": "Answer in English.",
-        "Espagnol": "Responde en español.",
-        "Japonais": "日本語で答えてください。"
-    }
+    if use_meta_doc:
+        extract = "\n\n".join(split.page_content for split in all_splits[:10])
+        meta_doc = Document(
+            page_content=get_meta_doc(extract),
+            metadata={"document_name": doc_name, "insert_date": datetime.now()}
+        )
+        all_splits.append(meta_doc)
+
+    vector_store.add_documents(all_splits)
+
+# Recherche vectorielle
+def retrieve(question: str):
+    return vector_store.similarity_search(question)
+
+# Construction du prompt QA
+def build_qa_messages(question: str, context: str) -> list:
     return [
-        ("system", "You are a helpful assistant."),
-        ("system", instructions.get(langue, "Answer in English.") + "\nUse max 3 sentences.\n" + context),
+        ("system", "You are an assistant for question-answering tasks."),
+        ("system", f"""Use this context to answer the question below in 3 short sentences. Say "I don't know" if not sure.\n\n{context}"""),
         ("user", question)
     ]
 
-def answer_question(question: str, langue: str = "Français", k: int = 5) -> str:
-    docs = retrieve(question, k=k)
+# Répondre à une question
+def answer_question(question: str, k: int = 5) -> str:
+    docs = retrieve(question)
     context = "\n\n".join(doc.page_content for doc in docs)
-    messages = build_qa_messages(question, context, langue)
-    return llm.invoke(messages).content
+    messages = build_qa_messages(question, context)
+    response = llm.invoke(messages)
+    return response.content
