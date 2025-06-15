@@ -43,6 +43,8 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+Mon compte **Azure OpenAI** : "https://larak-mby3li17-eastus2.services.ai.azure.com/models"
+
 > 🧠 Ce projet utilise **Azure OpenAI** pour accéder aux modèles `gpt-35-turbo` et `text-embedding-ada-002`. Les paramètres API sont stockés localement dans un fichier `config.toml` (non inclus dans le dépôt) ou gérés dans `st.secrets` si déployé sur Streamlit Cloud.
 
 ---
