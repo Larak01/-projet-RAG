@@ -5,6 +5,7 @@ import tempfile
 import streamlit as st
 import pandas as pd
 import sqlite3
+import glob
 
 from rag.langchain import answer_question as answer_langchain
 from rag.llamaindex import answer_question as answer_llamaindex
@@ -33,6 +34,17 @@ cursor.execute('''
 ''')
 conn.commit()
 
+def load_sample_pdfs(framework, samples_dir="samples"):
+    sample_paths = glob.glob(f"{samples_dir}/*.pdf")
+    for path in sample_paths:
+        file_name = os.path.basename(path)
+        if file_name not in st.session_state['stored_files']:
+            if framework == "LangChain":
+                store_pdf_langchain(path, file_name)
+            else:
+                store_pdf_llamaindex(path, file_name)
+            st.session_state['stored_files'].append(file_name)
+
 def main():
     st.title("🧠 Analyse de documents enrichie")
     st.subheader("Chargez vos PDF, interrogez-les, et laissez un avis.")
@@ -45,6 +57,9 @@ def main():
 
     # Nombre de documents à récupérer
     k = st.slider("📄 Nombre de documents à considérer pour la réponse", min_value=1, max_value=10, value=5)
+
+    # Charger les articles PDF de base
+    load_sample_pdfs(framework)
 
     uploaded_files = st.file_uploader("📂 Déposez vos fichiers ici", type=['pdf'], accept_multiple_files=True)
 
