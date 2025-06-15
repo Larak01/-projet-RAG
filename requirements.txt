@@ -8,5 +8,6 @@ toml
 llama-index-core
 llama-index-embeddings-azure-openai
 llama-index-llms-azure-openai
+llama-index-readers-file
 
 
